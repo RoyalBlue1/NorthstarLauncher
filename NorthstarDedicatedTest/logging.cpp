@@ -24,8 +24,9 @@ void CreateLogFiles()
 		time_t time = std::time(nullptr);
 		tm currentTime = *std::localtime(&time);
 		std::stringstream stream;
-
-		stream << std::put_time(&currentTime, (GetNorthstarPrefix() + "/logs/nslog%Y-%m-%d %H-%M-%S.txt").c_str());
+		std::string logFileName = GetNorthstarPrefix() + "/logs/";
+		logFileName.append(GetNorthstarLogName()).append("%Y-%m-%d %H-%M-%S.txt");
+		stream << std::put_time(&currentTime, logFileName.c_str());
 		spdlog::default_logger()->sinks().push_back(std::make_shared<spdlog::sinks::basic_file_sink_mt>(stream.str(), false));
 		spdlog::flush_on(spdlog::level::info);
 	}
@@ -176,7 +177,9 @@ long __stdcall ExceptionFilter(EXCEPTION_POINTERS* exceptionInfo)
 		time_t time = std::time(nullptr);
 		tm currentTime = *std::localtime(&time);
 		std::stringstream stream;
-		stream << std::put_time(&currentTime, (GetNorthstarPrefix() + "/logs/nsdump%Y-%m-%d %H-%M-%S.dmp").c_str());
+		std::string logFileName = GetNorthstarPrefix() + "/logs/";
+		logFileName.append(GetNorthstarLogName()).append("%Y-%m-%d %H-%M-%S.dmp");
+		stream << std::put_time(&currentTime, logFileName.c_str());
 
 		auto hMinidumpFile = CreateFileA(stream.str().c_str(), GENERIC_WRITE, FILE_SHARE_READ, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
 		if (hMinidumpFile)
