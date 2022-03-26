@@ -1,5 +1,7 @@
 #pragma once
 
+
+#include "squirrel_ida.h"
 void InitialiseClientSquirrel(HMODULE baseAddress);
 void InitialiseServerSquirrel(HMODULE baseAddress);
 
@@ -57,6 +59,13 @@ struct SQFuncRegistration
 		memset(this, 0, sizeof(SQFuncRegistration));
 		this->padding2 = 32;
 	}
+};
+
+struct SQStackInfos
+{
+	char* name;
+	char* sourceName;
+	SQInteger line;
 };
 
 // core sqvm funcs
@@ -127,6 +136,9 @@ extern sq_getboolType ServerSq_getbool;
 typedef SQRESULT (*sq_getType)(void* sqvm, SQInteger idx);
 extern sq_getType ServerSq_sq_get;
 extern sq_getType ClientSq_sq_get;
+
+typedef SQRESULT(*sq_getstackinfosType)(HSquirrelVM* sqvm, SQInteger level, SQStackInfos* infos, SQInteger callstacksize);
+extern sq_getstackinfosType ServerSq_sq_getstackinfos;
 
 template <ScriptContext context> class SquirrelManager
 {

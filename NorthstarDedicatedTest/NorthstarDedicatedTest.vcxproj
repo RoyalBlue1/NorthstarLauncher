@@ -115,6 +115,7 @@
     <ClInclude Include="chatcommand.h" />
     <ClInclude Include="clientchathooks.h" />
     <ClInclude Include="clientvideooverrides.h" />
+    <ClInclude Include="squirrel_ida.h" />
     <ClInclude Include="localchatwriter.h" />
     <ClInclude Include="plugins.h" />
     <ClInclude Include="plugin_abi.h" />

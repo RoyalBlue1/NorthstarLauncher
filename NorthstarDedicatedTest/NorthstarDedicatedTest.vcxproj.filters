@@ -1476,6 +1476,9 @@
     <ClInclude Include="localchatwriter.h">
       <Filter>Header Files\Client</Filter>
     </ClInclude>
+    <ClInclude Include="squirrel_ida.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
     <ClInclude Include="scriptservertoclientstringcommand.h">
       <Filter>Header Files\Client</Filter>
     </ClInclude>
