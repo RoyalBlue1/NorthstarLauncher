@@ -8,6 +8,12 @@
 #include "dedicated.h"
 #include <iostream>
 
+
+struct sq_closurePtr {
+	long type;
+	char*** value;
+};
+
 // hook forward declarations
 typedef SQInteger (*SQPrintType)(void* sqvm, char* fmt, ...);
 SQPrintType ClientSQPrint;
@@ -34,6 +40,15 @@ typedef char (*CallScriptInitCallbackType)(void* sqvm, const char* callback);
 CallScriptInitCallbackType ClientCallScriptInitCallback;
 CallScriptInitCallbackType ServerCallScriptInitCallback;
 template <ScriptContext context> char CallScriptInitCallbackHook(void* sqvm, const char* callback);
+
+typedef SQBool(*SQVMExecuteType)(HSquirrelVM* sqvm, sq_closurePtr* closure, int paramAmount, int intParam1, void* outres, bool raiseerror, int Executiontype);
+SQVMExecuteType ServerSQVMExecute;
+template <ScriptContext context> SQBool SQVMExecuteHook(HSquirrelVM* sqvm, sq_closurePtr* closure, int paramAmount, int intParam1, void* outres, bool raiseerror, int Executiontype);
+
+
+typedef SQBool(*SQVMExecuteType)(HSquirrelVM* sqvm, sq_closurePtr* closure, int paramAmount, int intParam1, void* outres, bool raiseerror, int Executiontype);
+SQVMExecuteType ServerSQVMExecute;
+template <ScriptContext context> SQBool SQVMExecuteHook(HSquirrelVM* sqvm, sq_closurePtr* closure, int paramAmount, int intParam1, void* outres, bool raiseerror, int Executiontype);
 
 // core sqvm funcs
 sq_compilebufferType ClientSq_compilebuffer;
@@ -86,6 +101,10 @@ sq_getboolType ServerSq_getbool;
 
 sq_getType ClientSq_sq_get;
 sq_getType ServerSq_sq_get;
+
+
+//debug funcs
+sq_getstackinfosType ServerSq_sq_getstackinfos;
 
 template <ScriptContext context> void ExecuteCodeCommand(const CCommand& args);
 
@@ -182,6 +201,8 @@ void InitialiseServerSquirrel(HMODULE baseAddress)
 
 	ServerSq_sq_get = (sq_getType)((char*)baseAddress + 0x7C00);
 
+	ServerSq_sq_getstackinfos = (sq_getstackinfosType)((char*)baseAddress + 0x35920);
+
 	ENABLER_CREATEHOOK(
 		hook, (char*)baseAddress + 0x1FE90, &SQPrintHook<ScriptContext::SERVER>,
 		reinterpret_cast<LPVOID*>(&ServerSQPrint)); // server print function
@@ -197,6 +218,9 @@ void InitialiseServerSquirrel(HMODULE baseAddress)
 	ENABLER_CREATEHOOK(
 		hook, (char*)baseAddress + 0x1D5C0, &CallScriptInitCallbackHook<ScriptContext::SERVER>,
 		reinterpret_cast<LPVOID*>(&ServerCallScriptInitCallback)); // server callscriptinitcallback function
+	ENABLER_CREATEHOOK(
+		hook, (char*)baseAddress + 0x2F950, &SQVMExecuteHook<ScriptContext::SERVER>,
+		reinterpret_cast<LPVOID*>(&ServerSQVMExecute));
 
 	// cheat and clientcmd_can_execute allows clients to execute this, but since it's unsafe we only allow it when cheats are enabled
 	// for script_client and script_ui, we don't use cheats, so clients can execute them on themselves all they want
@@ -288,6 +312,55 @@ template <ScriptContext context> void ScriptCompileErrorHook(void* sqvm, const c
 	// compilestring and stuff shouldn't tho
 	// though, that also has potential to be REALLY bad if we're compiling ui scripts lol
 }
+
+
+template <ScriptContext context> SQBool SQVMExecuteHook(HSquirrelVM* sqvm, sq_closurePtr* closure, int paramAmount, int intParam1, void* outres, bool raiseerror, int Executiontype)
+{
+
+	if (closure->type== OT_CLOSURE) 
+	{ //squirrel closure
+
+
+		SQClosure *actualClosure = (SQClosure*)closure->value;
+		
+		SQFunctionProto *funcproto = (SQFunctionProto*) actualClosure->funcproto._VAL;
+		if (actualClosure->funcproto._Type ==OT_FUNCPROTO)
+		{
+			SQString *funcnameSqrString = (SQString*)funcproto->funcName._VAL;
+
+			if (funcproto->funcName._Type==OT_STRING) 
+			{
+				char* funcname = &funcnameSqrString->string;
+				int length = funcnameSqrString->length;
+				SQStackInfos infos;
+				spdlog::info("ScriptExecute name: {} paramAmount: {} executiontype: {} callstacksize: {}", funcname, paramAmount, Executiontype,sqvm->_callstacksize);
+				for (int i = sqvm->_callstacksize-1; i >= 0; i--)
+				{
+					
+					ServerSq_sq_getstackinfos(sqvm, i, &infos, sqvm->_callstacksize);
+					spdlog::info("ScriptExecuteStack level: {} funcname: {}, filename: {} line: {}", i, infos.name, infos.sourceName, infos.line);
+
+				}
+				
+				
+				
+				
+				
+			}
+
+			
+		}
+		
+	}
+	
+	
+
+
+
+	return ServerSQVMExecute(sqvm, closure, paramAmount, intParam1, outres, raiseerror, Executiontype);
+}
+
+
 
 template <ScriptContext context> char CallScriptInitCallbackHook(void* sqvm, const char* callback)
 {

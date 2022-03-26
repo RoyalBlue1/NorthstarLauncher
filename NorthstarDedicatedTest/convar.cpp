@@ -217,7 +217,7 @@ void ConVar::SetValue(int nValue)
 	}
 
 	// Only valid for root ConVars.
-	assert(m_pParent == this);
+	//assert(m_pParent == this);
 
 	float flValue = (float)nValue;
 
@@ -252,7 +252,7 @@ void ConVar::SetValue(float flValue)
 	}
 
 	// Only valid for root ConVars.
-	assert(m_pParent == this);
+	//assert(m_pParent == this);
 
 	// Check bounds.
 	ClampValue(flValue);
@@ -286,7 +286,7 @@ void ConVar::SetValue(const char* pszValue)
 	const char* pszNewValue{};
 
 	// Only valid for root convars.
-	assert(m_pParent == this);
+	//assert(m_pParent == this);
 
 	float flOldValue = m_Value.m_fValue;
 	pszNewValue = (char*)pszValue;
@@ -348,7 +348,7 @@ void ConVar::SetValue(Color clValue)
 //-----------------------------------------------------------------------------
 void ConVar::ChangeStringValue(const char* pszTempVal, float flOldValue)
 {
-	assert(!(m_ConCommandBase.m_nFlags & FCVAR_NEVER_AS_STRING));
+	//assert(!(m_ConCommandBase.m_nFlags & FCVAR_NEVER_AS_STRING));
 
 	char* pszOldValue = (char*)_malloca(m_Value.m_iStringLength);
 	if (pszOldValue != NULL)
