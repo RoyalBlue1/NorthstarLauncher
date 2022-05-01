@@ -9,6 +9,21 @@ typedef long SQInteger;
 typedef unsigned long SQUnsignedInteger;
 typedef char SQChar;
 
+
+//ida definitions
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long uint64;
+typedef unsigned int uint;
+#define _BYTE  uint8
+#define _WORD  uint16
+#define _DWORD uint32
+#define _QWORD uint64
+#define SLOBYTE(x)   (*((int8*)&(x)))
+#define HIDWORD(x)  (*((_DWORD*)&(x)+1))
+#define LODWORD(x)  (*((_DWORD*)&(x)))
+
 typedef SQUnsignedInteger SQBool;
 typedef SQInteger SQRESULT;
 
@@ -17,6 +32,8 @@ const SQRESULT SQRESULT_NULL = 0;
 const SQRESULT SQRESULT_NOTNULL = 1;
 
 typedef SQInteger (*SQFunction)(void* sqvm);
+
+float fsqrt(float x);
 
 struct CompileBufferState
 {
@@ -31,6 +48,477 @@ struct CompileBufferState
 		bufferAgain = code.c_str();
 	}
 };
+
+
+struct CallInfo;
+struct SQTable;
+struct SQString;
+struct SQFunctionProto;
+struct SQClosure;
+struct SQSharedState;
+struct StringTable;
+struct SQStructInstance;
+struct SQStructDef;
+struct SQNativeClosure;
+struct SQArray;
+struct SQInstruction;
+
+/* 127 */
+enum SQObjectType : __int32
+{
+	_RT_NULL = 0x1,
+	_RT_INTEGER = 0x2,
+	_RT_FLOAT = 0x4,
+	_RT_BOOL = 0x8,
+	_RT_STRING = 0x10,
+	_RT_TABLE = 0x20,
+	_RT_ARRAY = 0x40,
+	_RT_USERDATA = 0x80,
+	_RT_CLOSURE = 0x100,
+	_RT_NATIVECLOSURE = 0x200,
+	_RT_GENERATOR = 0x400,
+	OT_USERPOINTER = 0x800,
+	_RT_USERPOINTER = 0x800,
+	_RT_THREAD = 0x1000,
+	_RT_FUNCPROTO = 0x2000,
+	_RT_CLASS = 0x4000,
+	_RT_INSTANCE = 0x8000,
+	_RT_WEAKREF = 0x10000,
+	OT_VECTOR = 0x40000,
+	SQOBJECT_CANBEFALSE = 0x1000000,
+	OT_NULL = 0x1000001,
+	OT_BOOL = 0x1000008,
+	SQOBJECT_DELEGABLE = 0x2000000,
+	SQOBJECT_NUMERIC = 0x4000000,
+	OT_INTEGER = 0x5000002,
+	OT_FLOAT = 0x5000004,
+	SQOBJECT_REF_COUNTED = 0x8000000,
+	OT_STRING = 0x8000010,
+	OT_ARRAY = 0x8000040,
+	OT_CLOSURE = 0x8000100,
+	OT_NATIVECLOSURE = 0x8000200,
+	OT_ASSET = 0x8000400,
+	OT_THREAD = 0x8001000,
+	OT_FUNCPROTO = 0x8002000,
+	OT_CLAAS = 0x8004000,
+	OT_STRUCT = 0x8200000,
+	OT_WEAKREF = 0x8010000,
+	OT_TABLE = 0xA000020,
+	OT_USERDATA = 0xA000080,
+	OT_INSTANCE = 0xA008000,
+	OT_ENTITY = 0xA400000,
+};
+
+/* 156 */
+union __declspec(align(8)) SQObjectValue
+{
+	SQString* asString;
+	SQTable* asTable;
+	SQClosure* asClosure;
+	SQFunctionProto* asFuncProto;
+	SQStructDef* asStructDef;
+	__int64 asInteger;
+	SQStructInstance* asStructInstance;
+	float asFloat;
+	SQNativeClosure* asNativeClosure;
+	SQArray* asArray;
+
+};
+
+/* 128 */
+struct __declspec(align(8)) SQObject
+{
+	SQObjectType _Type;
+	__int32 _structOffset;
+	SQObjectValue _VAL;
+};
+
+/* 138 */
+struct __declspec(align(8)) SQString
+{
+	__int64* vftable;
+	__int32 uiRef;
+	__int32 uiRef1;
+	SQString* _next_maybe;
+	SQSharedState* sharedState;
+	__int32 length;
+	uint8 gap_24[4];
+	char _hash[8];
+	char _val[1];
+};
+
+/* 137 */
+struct __declspec(align(8)) SQTable
+{
+	__int64* vftable;
+	uint8 gap_08[4];
+	__int32 uiRef;
+	uint8 gap_10[8];
+	void* pointer_18;
+	void* pointer_20;
+	void* _sharedState;
+	__int64 field_30;
+	void* pointer_38;
+	__int32 _numOfNodes;
+	__int32 size;
+	__int32 field_48;
+	__int32 _usedNodes;
+	uint8 _gap_50[20];
+	__int32 field_64;
+	uint8 _gap_68[80];
+};
+
+/* 140 */
+struct __declspec(align(8)) SQClosure
+{
+	void* vftable;
+	uint8 gap_08[4];
+	__int32 uiRef;
+	void* pointer_10;
+	void* pointer_18;
+	void* pointer_20;
+	void* sharedState;
+	SQObject obj_30;
+	SQObject _function;
+	SQObject* _outervalues;
+	uint8 gap_58[8];
+	uint8 gap_60[96];
+	SQObject* objectPointer_C0;
+};
+
+/* 139 */
+struct __declspec(align(8)) SQFunctionProto
+{
+	void* vftable;
+	uint8 gap_08[4];
+	__int32 uiRef;
+	uint8 gap_10[8];
+	void* pointer_18;
+	void* pointer_20;
+	void* sharedState;
+	void* pointer_30;
+	SQObject fileName;
+	SQObject funcName;
+	SQObject obj_58;
+	uint8 gap_68[64];
+	__int32 nParameters;
+	uint8 gap_AC[60];
+	__int32 nDefaultParams;
+	uint8 gap_EC[200];
+};
+
+/* 152 */
+struct SQStructDef
+{
+	uint8 gap_0[56];
+	SQString* name;
+	uint8 gap_[300];
+};
+
+/* 150 */
+struct SQStructInstance
+{
+	void* vftable;
+	uint8 gap_8[16];
+	void* pointer_18;
+	uint8 gap_20[8];
+	SQSharedState* _sharedState;
+	uint8 gap_30[8];
+	SQObject data[1];
+};
+
+/* 157 */
+struct __declspec(align(8)) SQNativeClosure
+{
+	void* vftable;
+	uint8 gap_08[4];
+	__int32 uiRef;
+	uint8 gap_10[88];
+	SQString* _name;
+	uint8 gap_0[300];
+};
+
+/* 148 */
+struct SQSharedState
+{
+	uint8 gap_0[72];
+	StringTable* _stringtable;
+	uint8 gap_50[30000];
+};
+
+/* 149 */
+struct StringTable
+{
+	uint8 gap_0[12];
+	int _numofslots;
+	uint8 gap_10[200];
+};
+
+/* 129 */
+struct __declspec(align(8)) HSquirrelVM
+{
+	void* vftable;
+	__int32 uiRef;
+	uint8 gap_8[12];
+	void* _toString;
+	void* _roottable_pointer;
+	void* pointer_28;
+	CallInfo* ci;
+	CallInfo* _callsstack;
+	__int32 _callsstacksize;
+	__int32 _stackbase;
+	SQObject* _stackOfCurrentFunction;
+	SQSharedState* sharedState;
+	void* pointer_58;
+	void* pointer_60;
+	__int32 _top;
+	SQObject* _stack;
+	uint8 gap_78[8];
+	SQObject* _vargsstack;
+	uint8 gap_88[8];
+	SQObject temp_reg;
+	uint8 gapA0[8];
+	void* pointer_A8;
+	uint8 gap_B0[8];
+	SQObject _roottable_object;
+	SQObject _lasterror;
+	SQObject _errorHandler;
+	__int64 field_E8;
+	__int32 traps;
+	uint8 gap_F4[12];
+	__int32 _nnativecalls;
+	__int32 _suspended;
+	__int32 _suspended_root;
+	__int32 _callstacksize;
+	__int32 _suspended_target;
+	__int32 field_114;
+	__int32 _suspend_varargs;
+	SQObject* _object_pointer_120;
+};
+
+/* 136 */
+struct __declspec(align(8)) CallInfo
+{
+	SQInstruction* ip;
+	SQObject* _literals;
+	SQObject obj10;
+	SQObject closure;
+	__int32 _etraps[4];
+	__int32 _root;
+	short _vargs_size;
+	short _vargs_base;
+};
+
+/* 135 */
+enum SQOpcode : int
+{
+	_OP_LOAD = 0x0,
+	_OP_LOADCOPY = 0x1,
+	_OP_LOADINT = 0x2,
+	_OP_LOADFLOAT = 0x3,
+	_OP_DLOAD = 0x4,
+	_OP_TAILCALL = 0x5,
+	_OP_CALL = 0x6,
+	_OP_PREPCALL = 0x7,
+	_OP_PREPCALLK = 0x8,
+	_OP_GETK = 0x9,
+	_OP_MOVE = 0xA,
+	_OP_NEWSLOT = 0xB,
+	_OP_DELETE = 0xC,
+	_OP_SET = 0xD,
+	_OP_GET = 0xE,
+	_OP_EQ = 0xF,
+	_OP_NE = 0x10,
+	_OP_ARITH = 0x11,
+	_OP_BITW = 0x12,
+	_OP_RETURN = 0x13,
+	_OP_LOADNULLS = 0x14,
+	_OP_LOADROOTTABLE = 0x15,
+	_OP_LOADBOOL = 0x16,
+	_OP_DMOVE = 0x17,
+	_OP_JMP = 0x18,
+	_OP_JNZ = 0x19,
+	_OP_JZ = 0x1A,
+	_OP_LOADFREEVAR = 0x1B,
+	_OP_VARGC = 0x1C,
+	_OP_GETVARGV = 0x1D,
+	_OP_NEWTABLE = 0x1E,
+	_OP_NEWARRAY = 0x1F,
+	_OP_APPENDARRAY = 0x20,
+	_OP_GETPARENT = 0x21,
+	_OP_COMPOUND_ARITH = 0x22,
+	_OP_COMPOUND_ARITH_LOCAL = 0x23,
+	_OP_INCREMENT_PREFIX = 0x24,
+	_OP_INCREMENT_PREFIX_LOCAL = 0x25,
+	_OP_INCREMENT_PREFIX_STRUCTFIELD = 0x26,
+	_OP_INCREMENT_POSTFIX = 0x27,
+	_OP_INCREMENT_POSTFIX_LOCAL = 0x28,
+	_OP_INCREMENT_POSTFIX_STRUCTFIELD = 0x29,
+	_OP_CMP = 0x2A,
+	_OP_EXISTS = 0x2B,
+	_OP_INSTANCEOF = 0x2C,
+	_OP_NEG = 0x2D,
+	_OP_NOT = 0x2E,
+	_OP_BWNOT = 0x2F,
+	_OP_CLOSURE = 0x30,
+	_OP_FOREACH = 0x31,
+	_OP_FOREACH_STATICARRAY_START = 0x32,
+	_OP_FOREACH_STATICARRAY_NEXT = 0x33,
+	_OP_FOREACH_STATICARRAY_NESTEDSTRUCT_START = 0x34,
+	_OP_FOREACH_STATICARRAY_NESTEDSTRUCT_NEXT = 0x35,
+	_OP_DELEGATE = 0x36,
+	_OP_CLONE = 0x37,
+	_OP_TYPEOF = 0x38,
+	_OP_PUSHTRAP = 0x39,
+	_OP_POPTRAP = 0x3A,
+	_OP_THROW = 0x3B,
+	_OP_CLASS = 0x3C,
+	_OP_NEWSLOTA = 0x3D,
+	_OP_EQ_LITERAL = 0x3E,
+	_OP_NE_LITERAL = 0x3F,
+	_OP_FOREACH_SETUP = 0x40,
+	_OP_ASSERT_FAILED = 0x41,
+	_OP_ADD = 0x42,
+	_OP_SUB = 0x43,
+	_OP_MUL = 0x44,
+	_OP_DIV = 0x45,
+	_OP_MOD = 0x46,
+	_OP_PREPCALLK_CALL = 0x47,
+	_OP_PREPCALLK_MOVE_CALL = 0x48,
+	_OP_PREPCALLK_LOADINT_CALL = 0x49,
+	_OP_CMP_JZ = 0x4A,
+	_OP_INCREMENT_LOCAL_DISCARD_JMP = 0x4B,
+	_OP_JZ_RETURN = 0x4C,
+	_OP_JZ_LOADBOOL_RETURN = 0x4D,
+	_OP_NEWVECTOR = 0x4E,
+	_OP_ZEROVECTOR = 0x4F,
+	_OP_GET_VECTOR_COMPONENT = 0x50,
+	_OP_SET_VECTOR_COMPONENT = 0x51,
+	_OP_VECTOR_COMPONENT_MINUSEQ = 0x52,
+	_OP_VECTOR_COMPONENT_PLUSEQ = 0x53,
+	_OP_VECTOR_COMPONENT_MULEQ = 0x54,
+	_OP_VECTOR_COMPONENT_DIVEQ = 0x55,
+	_OP_VECTOR_NORMALIZE = 0x56,
+	_OP_VECTOR_NORMALIZE_IN_PLACE = 0x57,
+	_OP_VECTOR_DOT_PRODUCT = 0x58,
+	_OP_VECTOR_DOT_PRODUCT2D = 0x59,
+	_OP_VECTOR_CROSS_PRODUCT = 0x5A,
+	_OP_VECTOR_CROSS_PRODUCT2D = 0x5B,
+	_OP_VECTOR_LENGTH = 0x5C,
+	_OP_VECTOR_LENGTHSQR = 0x5D,
+	_OP_VECTOR_LENGTH2D = 0x5E,
+	_OP_VECTOR_LENGTH2DSQR = 0x5F,
+	_OP_VECTOR_DISTANCE = 0x60,
+	_OP_VECTOR_DISTANCESQR = 0x61,
+	_OP_VECTOR_DISTANCE2D = 0x62,
+	_OP_VECTOR_DISTANCE2DSQR = 0x63,
+	_OP_INCREMENT_LOCAL_DISCARD = 0x64,
+	_OP_FASTCALL = 0x65,
+	_OP_FASTCALL_NATIVE = 0x66,
+	_OP_FASTCALL_NATIVE_ARGTYPECHECK = 0x67,
+	_OP_FASTCALL_ENV = 0x68,
+	_OP_FASTCALL_NATIVE_ENV = 0x69,
+	_OP_FASTCALL_NATIVE_ENV_ARGTYPECHECK = 0x6A,
+	_OP_LOADGLOBALARRAY = 0x6B,
+	_OP_GETGLOBAL = 0x6C,
+	_OP_SETGLOBAL = 0x6D,
+	_OP_COMPOUND_ARITH_GLOBAL = 0x6E,
+	_OP_GETSTRUCTFIELD = 0x6F,
+	_OP_SETSTRUCTFIELD = 0x70,
+	_OP_COMPOUND_ARITH_STRUCTFIELD = 0x71,
+	_OP_NEWSTRUCT = 0x72,
+	_OP_GETSUBSTRUCT = 0x73,
+	_OP_GETSUBSTRUCT_DYNAMIC = 0x74,
+	_OP_TYPECAST = 0x75,
+	_OP_TYPECHECK = 0x76,
+	_OP_TYPECHECK_ORNULL = 0x77,
+	_OP_TYPECHECK_NOTNULL = 0x78,
+	_OP_CHECK_ENTITY_CLASS = 0x79,
+	_OP_UNREACHABLE = 0x7A,
+	_OP_ARRAY_RESIZE = 0x7B,
+};
+
+/* 141 */
+struct __declspec(align(8)) SQStackInfos
+{
+	char* _name;
+	char* _sourceName;
+	__int32 _line;
+};
+
+/* 151 */
+struct __declspec(align(4)) SQInstruction
+{
+	int op;
+	int arg1;
+	int output;
+	__int16 arg2;
+	__int16 arg3;
+};
+
+/* 154 */
+struct SQLexer
+{
+	uint8 gap_0[112];
+};
+
+/* 153 */
+struct SQCompiler
+{
+	uint8 gap_0[4];
+	__int32 _token;
+	uint8 gap_8[8];
+	SQObject object_10;
+	SQLexer lexer;
+	uint8 gap_1[768];
+};
+
+/* 155 */
+struct CSquirrelVM
+{
+	uint8 gap_0[8];
+	HSquirrelVM* sqvm;
+};
+
+
+
+struct SQVector
+{
+	SQObjectType _Type;
+	float x;
+	float y;
+	float z;
+};
+
+
+struct SQArray
+{
+	void* vftable;
+	__int32 uiRef;
+	uint8 gap_24[36];
+	SQObject* _values;
+	__int32 _field_38;
+	__int32 _allocated;
+};
+
+
+#define INCREMENT_REFERENCECOUNT(val) if((val->_Type & SQOBJECT_REF_COUNTED) != 0) ++val->_VAL.asString->uiRef;
+
+
+#define DECREMENT_REFERENCECOUNT(val) if((val->_Type & SQOBJECT_REF_COUNTED) != 0){ \
+	if (val->_VAL.asString->uiRef-- == 1) {\
+        spdlog::info("Deleted SQObject of type {} with address {:X}", sq_getTypeName(val->_Type),val->_VAL.asInteger);\
+		(*(void(__fastcall**)(SQString*))(&val->_VAL.asString->vftable[1]))(val->_VAL.asString);} \
+	}
+
+
+
+
+
+
+
+
+
 
 struct SQFuncRegistration
 {
@@ -128,14 +616,143 @@ typedef SQRESULT (*sq_getType)(void* sqvm, SQInteger idx);
 extern sq_getType ServerSq_sq_get;
 extern sq_getType ClientSq_sq_get;
 
+
+//sqvmExecute functions
+typedef char (*SQVMStartCallType)(HSquirrelVM* a1, SQClosure* a2, int a3, __int64 nInputParams, unsigned int a5, char a6);
+extern SQVMStartCallType SQVMStartCall;
+typedef long long (*SQVMCallErrorHandlerType)(HSquirrelVM* sqvm, SQObject* a2);
+extern SQVMCallErrorHandlerType SQVMCallErrorHandler;
+typedef void (*sq_op_loadcopyType)(SQSharedState* a1, SQObject* a2, SQObject* a3);
+extern sq_op_loadcopyType sq_op_loadcopy;
+typedef bool (*sq_op_callType)(HSquirrelVM* a1, SQInstruction* a2, SQObject* a3, int* a4, ...);
+extern sq_op_callType sq_op_call;
+typedef long long (*sq_op_precallType)(HSquirrelVM* a1, SQInstruction* a2, SQObject* key);
+extern sq_op_precallType sq_op_precall;
+typedef char (*SQVMGetType)(HSquirrelVM* self, SQObject* key, SQObject* dest, SQObject* temp_reg, char a5, char a6);
+extern SQVMGetType SQVMGet;
+typedef int (*sub_35B80Type)(HSquirrelVM* a1, SQObject* a2, SQObject* a3);
+extern sub_35B80Type sub_35B80;
+typedef char (*SQVMNewSlotType)(HSquirrelVM* sqvm, SQObject* self, SQObject* key, SQObject* val, char bstatic);
+extern SQVMNewSlotType SQVMNewSlot;
+typedef char (*sub_34CF0Type)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, SQObject* a4);
+extern sub_34CF0Type sub_34CF0;
+typedef char (*sq_op_setType)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, SQObject* a4, char a5);
+extern sq_op_setType sq_op_set;
+typedef bool (*sq_op_eqType)(__int64 a1, SQObject* a2, SQObject* a3);
+extern sq_op_eqType sq_op_eq;
+typedef char (*sub_2B590Type)(HSquirrelVM* a1, int a2, SQObject* a3, SQObject* a4, SQObject* a5);
+extern sub_2B590Type sub_2B590;
+typedef long long (*sq_sqvm_ReturnType)(HSquirrelVM* a1, int _arg0, int _arg1, SQObject* retval);
+extern sq_sqvm_ReturnType sq_sqvm_Return;
+typedef SQObject* (*sq_copyObjectType)(SQObject* dest, SQObject* src);
+extern sq_copyObjectType sq_copyObject;
+typedef SQTable* (*sq_createTableType)(SQSharedState* sharedState, unsigned int length);
+extern sq_createTableType sq_createTable;
+typedef SQArray* (*sub_1800Type)(SQSharedState* a1, unsigned int a2);
+extern sub_1800Type sub_1800;
+typedef long long (*sub_1A20Type)(SQArray* a1, SQObject* a2);
+extern sub_1A20Type sub_1A20;
+typedef char (*sub_2F740Type)(HSquirrelVM* a1, SQObject* a2, SQObject* a3);
+extern sub_2F740Type sub_2F740;
+typedef long long (*sub_2E670Type)(HSquirrelVM* a1, unsigned int a2, SQObject* a3, SQObject* a4, SQObject* a5);
+extern sub_2E670Type sub_2E670;
+typedef bool (*sub_2B6C0Type)(HSquirrelVM* a1, __int64 a2, SQObject* a3, SQObject* a4, SQObject* a5);
+extern sub_2B6C0Type sub_2B6C0;
+typedef char (*sub_2E960Type)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, SQObject* a4, int a5);
+extern sub_2E960Type sub_2E960;
+typedef char (*sq_op_increment_prefix_localType)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, int a4);
+extern sq_op_increment_prefix_localType sq_op_increment_prefix_local;
+typedef char (*sp_op_increment_prefix_structfieldType)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, int a4, int a5);
+extern sp_op_increment_prefix_structfieldType sp_op_increment_prefix_structfield;
+typedef char (*sub_2EA30Type)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, SQObject* a4, int a5);
+extern sub_2EA30Type sub_2EA30;
+typedef char (*sub_2E860Type)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, int a4);
+extern sub_2E860Type sub_2E860;
+typedef char (*sq_op_increment_postfix_structfieldType)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, int a4, int a5);
+extern sq_op_increment_postfix_structfieldType sq_op_increment_postfix_structfield;
+typedef char (*sub_2D1E0Type)(HSquirrelVM* a1, int a2, SQObject* a3, SQObject* a4, SQObject* dest);
+extern sub_2D1E0Type sub_2D1E0;
+typedef char (*sub_2CF10Type)(HSquirrelVM* a1, SQObject* a2, SQObject* a3);
+extern sub_2CF10Type sub_2CF10;
+typedef char (*sub_2F0B0Type)(HSquirrelVM* a1, SQObject* a2, SQObject* a3);
+extern sub_2F0B0Type sub_2F0B0;
+typedef char (*sub_2EE20Type)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, SQObject* a4, SQObject* a5, int a6, int a7, int a8, SQInstruction** a9);
+extern sub_2EE20Type sub_2EE20;
+typedef char (*sub_2EF60Type)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, SQObject* a4);
+extern sub_2EF60Type sub_2EF60;
+typedef char (*sub_34A30Type)(HSquirrelVM* a1, SQObject* a2, SQObject* a3);
+extern sub_34A30Type sub_34A30;
+typedef long long (*sub_2D950Type)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, __int64 a4);
+extern sub_2D950Type sub_2D950;
+typedef long long (*sub_35800Type)(__int64* a1, int a2);
+extern sub_35800Type sub_35800;
+typedef long long (*sub_2F2F0Type)(HSquirrelVM* a1, SQObject* a2, int a3, int a4);
+extern sub_2F2F0Type sub_2F2F0;
+typedef long long (*sub_3EA70Type)(void* a1, SQObject* a2, SQObject* a3);
+extern sub_3EA70Type sub_3EA70;
+typedef SQObject* (*SQVMToStringType)(HSquirrelVM* a1, SQObject* object, SQObject* res);
+extern SQVMToStringType SQVMToString;
+typedef char (*sq_op_addType)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, SQObject* a4);
+extern sq_op_addType sq_op_add;
+typedef long long (*sq_dropStackType)(HSquirrelVM* a1, int a2);
+extern sq_dropStackType sq_dropStack;
+typedef long long (*sub_C6F0Type)(SQObject** a1, int a2);
+extern sub_C6F0Type sub_C6F0;
+typedef long long (*sub_27390Type)(SQObject* a1, int a2);
+extern sub_27390Type sub_27390;
+typedef SQStructInstance* (*sub_35B20Type)(HSquirrelVM* a1, SQObject* a2);
+extern sub_35B20Type sub_35B20;
+typedef char (*sq_op_subType)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, SQObject* a4);
+extern sq_op_subType sq_op_sub;
+typedef char (*sq_op_multiplicationType)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, SQObject* a4);
+extern sq_op_multiplicationType sq_op_multiplication;
+typedef char (*sq_op_divType)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, SQObject* a4);
+extern sq_op_divType sq_op_div;
+typedef char (*sq_op_moduloType)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, SQObject* a4);
+extern sq_op_moduloType sq_op_modulo;
+typedef char (*sq_compareType)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, uint32* a4);
+extern sq_compareType sq_compare;
+typedef SQObject* (*sq_setObjectToFloatType)(SQObject* a1, float a2);
+extern sq_setObjectToFloatType sq_setObjectToFloat;
+typedef char (*sub_2E100Type)(HSquirrelVM* sqvm, __int64 a2, int a3, int a4, unsigned int a5);
+extern sub_2E100Type sub_2E100;
+typedef char (*sq_nativecallType)(HSquirrelVM* sqvm, SQNativeClosure* a2, __int64 a3, unsigned int a4, SQObject* a5, uint32* a6, char a7);
+extern sq_nativecallType sq_nativecall;
+typedef char (*sq_op_typecastType)(HSquirrelVM* a1, SQObject* a2, SQObject* a3, int a4);
+extern sq_op_typecastType sq_op_typecast;
+typedef char (*sq_op_check_entity_classType)(HSquirrelVM* a1, SQObject* a2, __int64 a3);
+extern sq_op_check_entity_classType sq_op_check_entity_class;
+typedef long long (*sub_29A40Type)(SQSharedState* sharedState, SQObject* a2, int* a3);
+extern sub_29A40Type sub_29A40;
+typedef long long (*sub_63E00Type)(SQSharedState* a1, unsigned int a2, uint32* a3);
+extern sub_63E00Type sub_63E00;
+typedef void (*sub_2EDB0Type)(HSquirrelVM* a1, __int16* a2);
+extern sub_2EDB0Type sub_2EDB0;
+typedef SQString* (*sqStringTableAddType)(StringTable* a1, char* newString, int length);
+extern sqStringTableAddType sqStringTableAdd;
+typedef long long (*sub_BEF0Type)(SQObject* a1, unsigned int a2, SQObject* a3);
+extern sub_BEF0Type sub_BEF0;
+typedef long long (*SQVMRaise_ErrorType)(HSquirrelVM* a1, const char* a2, ...);
+extern SQVMRaise_ErrorType SQVMRaise_Error;
+
+
+
+
+
+
+
+
+
+
+
 template <ScriptContext context> class SquirrelManager
 {
   private:
 	std::vector<SQFuncRegistration*> m_funcRegistrations;
-
   public:
 	void* sqvm;
 	void* sqvm2;
+	SQObject* globalClosure;
 
   public:
 	SquirrelManager() : sqvm(nullptr) {}
@@ -143,7 +760,7 @@ template <ScriptContext context> class SquirrelManager
 	void VMCreated(void* newSqvm)
 	{
 		sqvm = newSqvm;
-		sqvm2 = *((void**)((char*)sqvm + 8)); // honestly not 100% sure on what this is, but alot of functions take it
+		sqvm2 = *(void**)((char*)newSqvm +8); // honestly not 100% sure on what this is, but alot of functions take it
 
 		for (SQFuncRegistration* funcReg : m_funcRegistrations)
 		{
@@ -156,6 +773,11 @@ template <ScriptContext context> class SquirrelManager
 		}
 	}
 
+	/*void setGlobalClosure(SQObject* closure)
+	{
+		globalClosure = closure;
+	}*/
+	
 	void VMDestroyed()
 	{
 		sqvm = nullptr;
@@ -288,6 +910,12 @@ template <ScriptContext context> class SquirrelManager
 		m_funcRegistrations.push_back(reg);
 	}
 };
+
+
+
+
+
+
 
 extern SquirrelManager<ScriptContext::CLIENT>* g_ClientSquirrelManager;
 extern SquirrelManager<ScriptContext::SERVER>* g_ServerSquirrelManager;
