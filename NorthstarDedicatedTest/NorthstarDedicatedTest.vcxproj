@@ -561,6 +561,7 @@
     <ClInclude Include="sourceconsole.h" />
     <ClInclude Include="sourceinterface.h" />
     <ClInclude Include="squirrel.h" />
+    <ClInclude Include="squirrelsocket.h" />
     <ClInclude Include="state.h" />
     <ClInclude Include="ExploitFixes.h" />
     <ClInclude Include="ExploitFixes_UTF8Parser.h" />
@@ -625,6 +626,7 @@
     <ClCompile Include="sourceinterface.cpp" />
     <ClCompile Include="squirrel.cpp" />
     <ClCompile Include="ExploitFixes.cpp" />
+    <ClCompile Include="squirrelsocket.cpp" />
     <ClCompile Include="version.cpp" />
   </ItemGroup>
   <ItemGroup>

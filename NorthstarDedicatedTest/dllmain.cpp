@@ -45,6 +45,7 @@
 #include <string.h>
 #include "version.h"
 #include "pch.h"
+#include "squirrelsocket.h"
 
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
@@ -218,6 +219,8 @@ bool InitialiseNorthstar()
 	AddDllLoadCallback("engine.dll", InitialiseEngineGameUtilFunctions);
 	AddDllLoadCallback("server.dll", InitialiseServerGameUtilFunctions);
 
+	
+
 	// dedi patches
 	{
 		AddDllLoadCallbackForDedicatedServer("tier0.dll", InitialiseDedicatedOrigin);
@@ -287,7 +290,8 @@ bool InitialiseNorthstar()
 
 	// activate exploit fixes
 	AddDllLoadCallback("server.dll", ExploitFixes::LoadCallback);
-
+	
+	AddDllLoadCallback("server.dll", InitialiseSquirrelSocket);
 	// run callbacks for any libraries that are already loaded by now
 	CallAllPendingDLLLoadCallbacks();
 
