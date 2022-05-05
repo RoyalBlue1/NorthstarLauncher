@@ -129,5 +129,4 @@ void InitialiseSquirrelSocket(HMODULE baseAddress) {
 	g_ServerSquirrelManager->AddFuncRegistration("void","NSSendSocketMessage","string message","",SQ_SendSocketMessage);
 	g_ServerSquirrelManager->AddFuncRegistration("string", "NSReadSocketMessage", "", "", SQ_ReadSocketMessage);
 
-		
 }

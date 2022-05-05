@@ -1515,6 +1515,9 @@
     <ClInclude Include="squirrelsocket.h">
       <Filter>Header Files\Shared</Filter>
     </ClInclude>
+    <ClInclude Include="scriptJson.h">
+      <Filter>Header Files\Shared</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -1683,6 +1686,9 @@
       <Filter>Source Files\Client</Filter>
     </ClCompile>
     <ClCompile Include="squirrelsocket.cpp">
+      <Filter>Source Files\Shared</Filter>
+    </ClCompile>
+    <ClCompile Include="scriptJson.cpp">
       <Filter>Source Files\Shared</Filter>
     </ClCompile>
   </ItemGroup>

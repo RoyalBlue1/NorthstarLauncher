@@ -86,6 +86,9 @@ sq_getboolType ServerSq_getbool;
 sq_getType ClientSq_sq_get;
 sq_getType ServerSq_sq_get;
 
+sq_newSlotType ServerSq_newSlot;
+sq_newTableType ServerSq_newTable;
+
 template <ScriptContext context> void ExecuteCodeCommand(const CCommand& args);
 
 // inits
@@ -190,6 +193,10 @@ void InitialiseServerSquirrel(HMODULE baseAddress)
 	ServerSq_getbool = (sq_getboolType)((char*)baseAddress + 0x6110);
 
 	ServerSq_sq_get = (sq_getType)((char*)baseAddress + 0x7C00);
+
+
+	ServerSq_newSlot = (sq_newSlotType)((char*)baseAddress + 0x7080);
+	ServerSq_newTable = (sq_newTableType)((char*)baseAddress + 0x3960);
 
 	ENABLER_CREATEHOOK(
 		hook,
