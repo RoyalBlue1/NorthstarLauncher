@@ -140,7 +140,7 @@ struct __declspec(align(8)) SQTable
 	void* pointer_20;
 	void* _sharedState;
 	__int64 field_30;
-	tableNode* pointer_38;
+	tableNode* _nodes;
 	__int32 _numOfNodes;
 	__int32 size;
 	__int32 field_48;
@@ -479,7 +479,7 @@ struct SQArray
 	__int32 uiRef;
 	uint8 gap_24[36];
 	SQObject* _values;
-	__int32 _field_38;
+	__int32 _usedSlots;
 	__int32 _allocated;
 };
 
@@ -494,7 +494,7 @@ struct SQArray
 	}
 
 
-
+const char* sq_getTypeName(int type);
 
 
 struct CompileBufferState
@@ -610,10 +610,11 @@ extern sq_getType ClientSq_sq_get;
 
 typedef SQRESULT (*sq_newTableType)(void* sqvm);
 extern sq_newTableType ServerSq_newTable;
+extern sq_newTableType ClientSq_newTable;
 
 typedef SQRESULT(*sq_newSlotType)(void* sqvm, int idx, bool bStatic);
 extern sq_newSlotType ServerSq_newSlot;
-
+extern sq_newSlotType ClientSq_newSlot;
 
 template <ScriptContext context> class SquirrelManager
 {

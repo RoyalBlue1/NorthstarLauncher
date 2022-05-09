@@ -87,7 +87,10 @@ sq_getType ClientSq_sq_get;
 sq_getType ServerSq_sq_get;
 
 sq_newSlotType ServerSq_newSlot;
+sq_newSlotType ClientSq_newSlot;
+
 sq_newTableType ServerSq_newTable;
+sq_newTableType ClientSq_newTable;
 
 template <ScriptContext context> void ExecuteCodeCommand(const CCommand& args);
 
@@ -144,6 +147,9 @@ void InitialiseClientSquirrel(HMODULE baseAddress)
 	ClientSq_getbool = (sq_getboolType)((char*)baseAddress + 0x6130);
 
 	ClientSq_sq_get = (sq_getType)((char*)baseAddress + 0x7C30);
+
+	ClientSq_newTable = (sq_newTableType)((char*)baseAddress + 0x5940);
+	ClientSq_newSlot = (sq_newSlotType)((char*)baseAddress + 0x70B0);
 
 	ENABLER_CREATEHOOK(
 		hook,
@@ -454,4 +460,56 @@ template <ScriptContext context> void ExecuteCodeCommand(const CCommand& args)
 		g_UISquirrelManager->ExecuteCode(args.ArgS());
 	else if (context == ScriptContext::SERVER)
 		g_ServerSquirrelManager->ExecuteCode(args.ArgS());
+}
+
+const char* sq_getTypeName(int type)
+{
+	switch (type) {
+	case OT_ASSET:
+		return "asset";
+	case OT_INTEGER:
+		return "int";
+	case OT_BOOL:
+		return "bool";
+	case SQOBJECT_NUMERIC:
+		return "float or int";
+	case OT_NULL:
+		return "null";
+	case OT_VECTOR:
+		return "vector";
+	case 0:
+		return "var";
+	case OT_USERDATA:
+		return "userdata";
+	case OT_FLOAT:
+		return "float";
+	case OT_STRING:
+		return "string";
+	case 0x8000040:
+		return "array";
+	case 0x8000200:
+		return "function";
+	case 0x8100000:
+		return "structdef";
+	case OT_THREAD:
+		return "thread";
+	case OT_FUNCPROTO:
+		return "function";
+	case OT_CLAAS:
+		return "class";
+	case OT_WEAKREF:
+		return "weakref";
+	case 0x8080000:
+		return "unimplemented function";
+	case 0x8200000:
+		return "struct instance";
+	case 0xA000020:
+		return "table";
+	case 0xA008000:
+		return "instance";
+	case 0xA400000:
+		return "entity";
+
+	}
+	return "";
 }
