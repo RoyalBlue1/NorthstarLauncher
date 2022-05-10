@@ -528,7 +528,67 @@ void clientSq_DecodeJSON_Array(void* sqvm, rapidjson::Value* arr) {
 }
 
 
+SQRESULT serverSq_castToTable(void* sqvm) {
+	HSquirrelVM* vm = (HSquirrelVM*)sqvm;
+	SQObject* table = &vm->_stackOfCurrentFunction[1];
+	SQObject* target = &vm->_stackOfCurrentFunction[2];
+	if (table->_Type != OT_TABLE) {
+		spdlog::info("Casting to table failed");
+		ServerSq_newTable(sqvm);
+		return SQRESULT_NOTNULL;
+	}
+	DECREMENT_REFERENCECOUNT(target);
+	target->_Type = OT_TABLE;
+	target->_VAL = table->_VAL;
+	return SQRESULT_NOTNULL;
+}
 
+SQRESULT clientSq_castToTable(void* sqvm) {
+	HSquirrelVM* vm = (HSquirrelVM*)sqvm;
+	SQObject* table = &vm->_stackOfCurrentFunction[1];
+	SQObject* target = &vm->_stackOfCurrentFunction[2];
+	if (table->_Type != OT_TABLE) {
+		spdlog::info("Casting to table failed");
+		ClientSq_newTable(sqvm);
+		return SQRESULT_NOTNULL;
+	}
+	DECREMENT_REFERENCECOUNT(target);
+	target->_Type = OT_TABLE;
+	target->_VAL = table->_VAL;
+	return SQRESULT_NOTNULL;
+}
+
+
+
+SQRESULT serverSq_castToArray(void* sqvm) {
+	HSquirrelVM* vm = (HSquirrelVM*)sqvm;
+	SQObject* arr = &vm->_stackOfCurrentFunction[1];
+	SQObject* target = &vm->_stackOfCurrentFunction[2];
+	if (arr->_Type != OT_ARRAY) {
+		spdlog::info("Casting to array failed");
+		return SQRESULT_NOTNULL;
+	}
+	DECREMENT_REFERENCECOUNT(target);
+	target->_Type = OT_ARRAY;
+	target->_VAL = arr->_VAL;
+	return SQRESULT_NOTNULL;
+}
+
+SQRESULT clientSq_castToArray(void* sqvm) {
+	HSquirrelVM* vm = (HSquirrelVM*)sqvm;
+	SQObject* arr = &vm->_stackOfCurrentFunction[1];
+	SQObject* target = &vm->_stackOfCurrentFunction[2];
+	if (arr->_Type != OT_ARRAY) {
+		spdlog::info("Casting to array failed");
+		ClientSq_newarray(sqvm,0);
+		return SQRESULT_NOTNULL;
+	}
+	DECREMENT_REFERENCECOUNT(target);
+	target->_Type = OT_ARRAY;
+	target->_VAL = arr->_VAL;
+	return SQRESULT_NOTNULL;
+		
+}
 
 
 
@@ -536,8 +596,20 @@ void InitialiseSquirrelJson(HMODULE baseAddress) {
 
 	g_ServerSquirrelManager->AddFuncRegistration("table", "DecodeJSON", "string json", "", serverSq_DecodeJSON);
 	g_ServerSquirrelManager->AddFuncRegistration("string", "EncodeJSON", "table data", "", sq_EncodeJSON);
+	g_ServerSquirrelManager->AddFuncRegistration("table", "castToTable", "var tab", "", serverSq_castToTable);
+	g_ServerSquirrelManager->AddFuncRegistration("array", "castToArray", "var arr", "", serverSq_castToArray);
+	
+	
 	g_ClientSquirrelManager->AddFuncRegistration("table", "DecodeJSON", "string json", "", clientSq_DecodeJSON);
 	g_ClientSquirrelManager->AddFuncRegistration("string", "EncodeJSON", "table data", "", sq_EncodeJSON);
+	g_ClientSquirrelManager->AddFuncRegistration("table", "castToTable", "var table", "", clientSq_castToTable);
+	g_ClientSquirrelManager->AddFuncRegistration("array", "castToArray", "var array", "", clientSq_castToArray);
+	
+	
 	g_UISquirrelManager->AddFuncRegistration("table", "DecodeJSON", "string json", "", clientSq_DecodeJSON);
 	g_UISquirrelManager->AddFuncRegistration("string", "EncodeJSON", "table data", "", sq_EncodeJSON);
+	g_UISquirrelManager->AddFuncRegistration("table", "castToTable", "var table", "", clientSq_castToTable);
+	g_UISquirrelManager->AddFuncRegistration("array", "castToArray", "var array", "", clientSq_castToArray);
+	
+	
 }

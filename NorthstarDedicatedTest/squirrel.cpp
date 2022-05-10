@@ -86,6 +86,8 @@ sq_getboolType ServerSq_getbool;
 sq_getType ClientSq_sq_get;
 sq_getType ServerSq_sq_get;
 
+
+
 sq_newSlotType ServerSq_newSlot;
 sq_newSlotType ClientSq_newSlot;
 
