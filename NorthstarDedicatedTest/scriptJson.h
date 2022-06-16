@@ -1,4 +1,5 @@
 #pragma once
 
 
-void InitialiseSquirrelJson(HMODULE baseAddress);
+void InitialiseServerSquirrelJson(HMODULE baseAddress);
+void InitialiseClientSquirrelJson(HMODULE baseAddress);

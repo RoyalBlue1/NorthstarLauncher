@@ -261,6 +261,7 @@ bool InitialiseNorthstar()
 		AddDllLoadCallbackForClient("engine.dll", InitialiseDebugOverlay);
 		// audio hooks
 		AddDllLoadCallbackForClient("client.dll", InitialiseMilesAudioHooks);
+		AddDllLoadCallbackForClient("client.dll", InitialiseClientSquirrelJson);
 	}
 
 	AddDllLoadCallback("engine.dll", InitialiseEngineSpewFuncHooks);
@@ -271,7 +272,7 @@ bool InitialiseNorthstar()
 	AddDllLoadCallback("server.dll", InitialiseMiscServerScriptCommand);
 	AddDllLoadCallback("server.dll", InitialiseMiscServerFixes);
 	AddDllLoadCallback("server.dll", InitialiseBuildAINFileHooks);
-
+	AddDllLoadCallback("server.dll", InitialiseServerSquirrelJson);
 	AddDllLoadCallback("engine.dll", InitialisePlaylistHooks);
 
 	AddDllLoadCallback("filesystem_stdio.dll", InitialiseFilesystem);
@@ -291,7 +292,6 @@ bool InitialiseNorthstar()
 
 	// activate exploit fixes
 	AddDllLoadCallback("server.dll", ExploitFixes::LoadCallback);
-	AddDllLoadCallback("server.dll", InitialiseSquirrelJson);
 	AddDllLoadCallback("server.dll", InitialiseSquirrelSocket);
 	// run callbacks for any libraries that are already loaded by now
 	CallAllPendingDLLLoadCallbacks();
