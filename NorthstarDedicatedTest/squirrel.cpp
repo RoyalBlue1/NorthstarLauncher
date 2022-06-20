@@ -523,3 +523,26 @@ const char* sq_getTypeName(int type)
 	}
 	return "";
 }
+
+int getReturnTypeEnumFromString(const char* name) {
+	if (strcmp(name, "bool"))
+		return SQReturnTypeEnum::boolean;
+	if (strcmp(name, "float"))
+		return SQReturnTypeEnum::floats;
+	if (strcmp(name, "vector"))
+		return SQReturnTypeEnum::vector;
+	if (strcmp(name, "int"))
+		return SQReturnTypeEnum::integer;
+	if (strcmp(name, "entity"))
+		return SQReturnTypeEnum::entity;
+	if (strcmp(name, "string"))
+		return SQReturnTypeEnum::string;
+	if (strcmp(name, "array"))
+		return SQReturnTypeEnum::arrays;
+	if (strcmp(name, "asset"))
+		return SQReturnTypeEnum::asset;
+	if (strcmp(name, "table"))
+		return SQReturnTypeEnum::table;
+
+	return SQReturnTypeEnum::stringOrNull;
+}

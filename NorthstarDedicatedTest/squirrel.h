@@ -511,6 +511,19 @@ struct CompileBufferState
 	}
 };
 
+enum SQReturnTypeEnum {
+	floats = 0x1,
+	vector = 0x3,
+	integer = 0x5,
+	boolean = 0x6,
+	entity = 0xD,
+	string = 0x21,
+	stringOrNull = 0x20,
+	arrays = 0x25,
+	asset = 0x28,
+	table = 0x26,
+};
+int getReturnTypeEnumFromString(const char* name);
 struct SQFuncRegistration
 {
 	const char* squirrelFuncName;
@@ -776,6 +789,7 @@ template <ScriptContext context> class SquirrelManager
 		strcpy((char*)reg->argTypes, argTypes.c_str());
 
 		reg->funcPtr = func;
+		reg->padding2 = getReturnTypeEnumFromString(name.c_str());
 
 		m_funcRegistrations.push_back(reg);
 	}
