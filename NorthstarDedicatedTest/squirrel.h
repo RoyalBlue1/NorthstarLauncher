@@ -565,7 +565,7 @@ extern sq_arrayappendType ClientSq_arrayappend;
 extern sq_arrayappendType ServerSq_arrayappend;
 
 // sq stack push funcs
-typedef void (*sq_pushstringType)(void* sqvm, const SQChar* str, SQInteger stackpos);
+typedef void (*sq_pushstringType)(void* sqvm, const SQChar* str, SQInteger strLength);//strLenght == -1 means str is a null terminated string
 extern sq_pushstringType ClientSq_pushstring;
 extern sq_pushstringType ServerSq_pushstring;
 
@@ -615,6 +615,10 @@ extern sq_newTableType ClientSq_newTable;
 typedef SQRESULT(*sq_newSlotType)(void* sqvm, int idx, bool bStatic);
 extern sq_newSlotType ServerSq_newSlot;
 extern sq_newSlotType ClientSq_newSlot;
+
+typedef SQRESULT(*sq_pushAssetType)(void* sqvm, const SQChar* assetName, SQInteger nameLength); // nameLength == -1 means assetName is a null terminated string
+extern sq_pushAssetType ServerSq_pushAsset;
+extern sq_pushAssetType ClientSq_pushAsset;
 
 template <ScriptContext context> class SquirrelManager
 {

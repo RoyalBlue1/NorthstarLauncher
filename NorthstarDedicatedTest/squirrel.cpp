@@ -70,6 +70,10 @@ sq_pushboolType ServerSq_pushbool;
 sq_pusherrorType ClientSq_pusherror;
 sq_pusherrorType ServerSq_pusherror;
 
+sq_pushAssetType ClientSq_pushAsset;
+sq_pushAssetType ServerSq_pushAsset;
+
+
 // sq stack get funcs
 sq_getstringType ClientSq_getstring;
 sq_getstringType ServerSq_getstring;
@@ -142,16 +146,19 @@ void InitialiseClientSquirrel(HMODULE baseAddress)
 	ClientSq_pushfloat = (sq_pushfloatType)((char*)baseAddress + 0x3800);
 	ClientSq_pushbool = (sq_pushboolType)((char*)baseAddress + 0x3710);
 	ClientSq_pusherror = (sq_pusherrorType)((char*)baseAddress + 0x8470);
+	ClientSq_pushAsset = (sq_pushAssetType)((char*)baseAddress + 0x3560);
 
 	ClientSq_getstring = (sq_getstringType)((char*)baseAddress + 0x60C0);
 	ClientSq_getinteger = (sq_getintegerType)((char*)baseAddress + 0x60E0);
 	ClientSq_getfloat = (sq_getfloatType)((char*)baseAddress + 0x6100);
 	ClientSq_getbool = (sq_getboolType)((char*)baseAddress + 0x6130);
-
+	
 	ClientSq_sq_get = (sq_getType)((char*)baseAddress + 0x7C30);
 
 	ClientSq_newTable = (sq_newTableType)((char*)baseAddress + 0x5940);
 	ClientSq_newSlot = (sq_newSlotType)((char*)baseAddress + 0x70B0);
+	
+	
 
 	ENABLER_CREATEHOOK(
 		hook,
@@ -194,12 +201,13 @@ void InitialiseServerSquirrel(HMODULE baseAddress)
 	ServerSq_pushfloat = (sq_pushfloatType)((char*)baseAddress + 0x3800);
 	ServerSq_pushbool = (sq_pushboolType)((char*)baseAddress + 0x3710);
 	ServerSq_pusherror = (sq_pusherrorType)((char*)baseAddress + 0x8440);
-
+	ServerSq_pushAsset = (sq_pushAssetType)((char*)baseAddress + 0x3560);
+	
 	ServerSq_getstring = (sq_getstringType)((char*)baseAddress + 0x60A0);
 	ServerSq_getinteger = (sq_getintegerType)((char*)baseAddress + 0x60C0);
 	ServerSq_getfloat = (sq_getfloatType)((char*)baseAddress + 0x60E0);
 	ServerSq_getbool = (sq_getboolType)((char*)baseAddress + 0x6110);
-
+	
 	ServerSq_sq_get = (sq_getType)((char*)baseAddress + 0x7C00);
 
 
