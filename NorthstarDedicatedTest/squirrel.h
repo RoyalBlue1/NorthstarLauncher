@@ -512,16 +512,16 @@ struct CompileBufferState
 };
 
 enum SQReturnTypeEnum {
-	floats = 0x1,
-	vector = 0x3,
-	integer = 0x5,
-	boolean = 0x6,
-	entity = 0xD,
-	string = 0x21,
-	stringOrNull = 0x20,
-	arrays = 0x25,
-	asset = 0x28,
-	table = 0x26,
+	SqFloat = 0x1,
+	SqVector = 0x3,
+	SqInteger = 0x5,
+	SqBoolean = 0x6,
+	SqEntity = 0xD,
+	SqString = 0x21,
+	SqStringOrNull = 0x20,
+	SqArrays = 0x25,
+	SqAsset = 0x28,
+	SqTable = 0x26,
 };
 int getReturnTypeEnumFromString(const char* name);
 struct SQFuncRegistration
