@@ -98,6 +98,7 @@ sq_getType ServerSq_sq_get;
 
 const char* sq_OpToString(int op) {
     switch (op) {
+    case _OP_LINE: return "_OP_LINE"; //probably stripped
     case _OP_LOAD: return "_OP_LOAD";
     case _OP_LOADCOPY: return "_OP_LOADCOPY";
     case _OP_LOADINT: return "_OP_LOADINT";
@@ -743,16 +744,16 @@ template <ScriptContext context> long long SQVMExecuteHook(HSquirrelVM* sqvm, SQ
     SQSharedState* sharedState = sqvm->sharedState;
     int traps = 0;
     SQInstruction* Instruction; // r14
-    uint opCode; // eax
-    _QWORD savedSharedState = *(_QWORD*)&sharedState->gap_50[16864];
-    *(_QWORD*)&sharedState->gap_50[16864] = (long long)sqvm;
+
+    HSquirrelVM* savedSharedState = sharedState->_currentThreadMaybe;
+    sharedState->_currentThreadMaybe = sqvm;
     if (calltype)
     {
-        if ((_DWORD)calltype == 1 || (unsigned int)(calltype - 2) <= 1)
+        if ((calltype == 1) || (calltype <= 3))
         {
-            traps = sqvm->field_114;
+            traps = sqvm->trapAmount;
             sqvm->ci->_root = sqvm->_suspended_root;
-            *((_DWORD*)&sqvm->ci->_vargs_base) = sqvm->_suspend_varargs;
+            sqvm->ci->_vargs_base = sqvm->_suspend_varargs;
             sqvm->_suspended = 0;
             if (calltype == 3)
                 goto label_errorHandler;
@@ -773,7 +774,7 @@ template <ScriptContext context> long long SQVMExecuteHook(HSquirrelVM* sqvm, SQ
         {
             if (!sqvm->ci)
                 SQVMCallErrorHandler(sqvm, &sqvm->_lasterror);
-            *(_QWORD*)&sqvm->sharedState->gap_50[16864] = savedSharedState;
+            sharedState->_currentThreadMaybe = savedSharedState;
             --sqvm->_nnativecalls;
             return 0;
         }
@@ -783,15 +784,15 @@ template <ScriptContext context> long long SQVMExecuteHook(HSquirrelVM* sqvm, SQ
 exeption_restore:
     while (2)
     {
-        Instruction = (SQInstruction*)((long long)sqvm->ci->ip + 16);
+        Instruction = &sqvm->ci->ip[1];
         sqvm->ci->ip = Instruction;
-        opCode = Instruction->op - 1;
+
 
         //spdlog::info("Opcode: {}, stackbase {}", (signed int)opCode, sqvm->_stackbase);
-        spdlog::info("OpCode: {}, output: {}, arg1: {}, arg2: {}, arg3: {}", sq_OpToString(opCode),Instruction->output,  Instruction->arg1, Instruction->arg2, Instruction->arg3);
+        spdlog::info("OpCode: {}, output: {}, arg1: {}, arg2: {}, arg3: {}", sq_OpToString(Instruction->op),Instruction->output,  Instruction->arg1, Instruction->arg2, Instruction->arg3);
         //spdlog::info("OpCode: {};{:X}, output: {};{:X}, arg1: {};{:X}, arg2: {};{:X}, arg3: {};{:X}", opCode, opCode, Instruction->output, Instruction->output, Instruction->arg1, Instruction->arg1, Instruction->arg2, Instruction->arg2, Instruction->arg3, Instruction->arg3);
 
-        switch (opCode)
+        switch (Instruction->op)
         {
         case _OP_LOAD: {
             SQObject* target;
@@ -838,7 +839,7 @@ exeption_restore:
             if (!sq_op_call(sqvm, Instruction, outres, &traps, 1))
                 goto label_errorHandler;
             if (sqvm->_suspended) {
-                *(_QWORD*)&sqvm->sharedState->gap_50[16864] = savedSharedState;
+                sharedState->_currentThreadMaybe = savedSharedState;
                 --sqvm->_nnativecalls;
                 return 1;
             }
@@ -849,7 +850,7 @@ exeption_restore:
                 goto label_errorHandler;
             if (sqvm->_suspended)
             {
-                *(_QWORD*)&sqvm->sharedState->gap_50[16864] = savedSharedState;
+                sharedState->_currentThreadMaybe = savedSharedState;
                 --sqvm->_nnativecalls;
                 return 1;
             }
@@ -988,7 +989,7 @@ exeption_restore:
                 continue;
             sq_copyObject(outres, &sqvm->temp_reg);
 
-            *(_QWORD*)&sqvm->sharedState->gap_50[16864] = savedSharedState;
+            sharedState->_currentThreadMaybe = savedSharedState;
             spdlog::info("Return of {}", closure->_VAL.asClosure->_function._VAL.asFuncProto->funcName._VAL.asString->_val);
             --sqvm->_nnativecalls;
             return 1;
@@ -1032,7 +1033,7 @@ exeption_restore:
             target->_VAL = source->_VAL;
             continue; }
         case _OP_JMP:
-            sqvm->ci->ip = (SQInstruction*)((long long)sqvm->ci->ip + 16i64 * Instruction->arg1);
+            sqvm->ci->ip = &sqvm->ci->ip[Instruction->arg1];
             continue;
         case _OP_JNZ: {
             SQObject* target = &sqvm->_stackOfCurrentFunction[Instruction->output];
@@ -1041,18 +1042,17 @@ exeption_restore:
             {
                 if (target->_VAL.asInteger)
                 {
-                    
-                    sqvm->ci->ip = (SQInstruction*)((long long)sqvm->ci->ip + 16i64 * Instruction->arg1);
+                    sqvm->ci->ip = &sqvm->ci->ip[Instruction->arg1];
                 }
             }
             else
             {
                 if (target->_Type != OT_FLOAT) {
-                    sqvm->ci->ip = (SQInstruction*)((long long)sqvm->ci->ip + 16i64 * Instruction->arg1);
+                    sqvm->ci->ip = &sqvm->ci->ip[Instruction->arg1];
                 }
                 else if (target->_VAL.asFloat != 0.0)
                 {
-                    sqvm->ci->ip = (SQInstruction*)((long long)sqvm->ci->ip + 16i64 * Instruction->arg1);
+                    sqvm->ci->ip = &sqvm->ci->ip[Instruction->arg1];
                 }
             }
             continue; }
@@ -1062,12 +1062,12 @@ exeption_restore:
             {
                 if (!(target->_VAL.asInteger))
                 {
-                    sqvm->ci->ip = (SQInstruction*)((long long)sqvm->ci->ip + 16i64 * Instruction->arg1);
+                    sqvm->ci->ip = &sqvm->ci->ip[Instruction->arg1];
                 }
             }
             else if (target->_Type == OT_FLOAT && target->_VAL.asFloat == 0.0)
             {
-                sqvm->ci->ip = (SQInstruction*)((long long)sqvm->ci->ip + 16i64 * Instruction->arg1);
+                sqvm->ci->ip = &sqvm->ci->ip[Instruction->arg1];
             }
             continue; }
         case _OP_LOADFREEVAR: {
@@ -1407,7 +1407,7 @@ exeption_restore:
             arg1Obj->_Type = OT_INTEGER;
             arg1Obj->_VAL.asInteger = 0;
 
-
+            //TODO fix struct behaviour
             SQObject* arg2Obj = &sqvm->_stackOfCurrentFunction[(unsigned __int16)Instruction->arg2];
             SQObject* arg1_1Obj = &sqvm->_stackOfCurrentFunction[Instruction->arg1 + 1]; //closure
             int structOffset = 2i64 * arg2Obj->_structOffset;
@@ -1419,7 +1419,7 @@ exeption_restore:
             continue; }
         case _OP_FOREACH_STATICARRAY_NEXT: {
 
-
+            //TODO fix struct behaviour
             SQObject* arg2Obj = &sqvm->_stackOfCurrentFunction[Instruction->arg2 + 2];
             int arg2Int = ++arg2Obj->_VAL.asInteger;
             if (arg2Int >= (unsigned __int16)Instruction->arg3)
@@ -1462,7 +1462,7 @@ exeption_restore:
             sq_copyObject(
                 &sqvm->_stackOfCurrentFunction[(unsigned __int16)Instruction->arg2 + 1],
                 &sqvm->_stackOfCurrentFunction[(unsigned __int8)Instruction->arg1]);
-            sqvm->ci->ip = (SQInstruction*)((long long)sqvm->ci->ip + 16i64 * Instruction->output);
+            sqvm->ci->ip = &sqvm->ci->ip[Instruction->output];
 
             continue; }
         case _OP_DELEGATE: {
@@ -1514,7 +1514,7 @@ exeption_restore:
             *target = res;
             DECREMENT_REFERENCECOUNT((&res));
             continue; }
-        case _OP_PUSHTRAP: {
+        case _OP_PUSHTRAP: { //TODO cleanup maybe redo
             long long data1;
             long long data2;
 
@@ -2277,7 +2277,7 @@ exeption_restore:
 
                 sqvm->_suspended = 1;
                 sqvm->_suspended_target = Instruction->output;
-                sqvm->field_114 = traps;
+                sqvm->trapAmount = traps;
                 sqvm->_suspended_root = sqvm->ci->_root;
                 sqvm->_suspend_varargs = *(&sqvm->ci->_root + 1);
                 if (*(&sqvm->_suspend_varargs + 1) == 0)
@@ -2286,7 +2286,7 @@ exeption_restore:
                     sq_copyObject(outres, sqvm->_object_pointer_120);
                 *(&sqvm->_suspend_varargs + 1) = 0;
                 DECREMENT_REFERENCECOUNT((&res));
-                *(_QWORD*)&sqvm->sharedState->gap_50[16864] = savedSharedState;
+                sharedState->_currentThreadMaybe = savedSharedState;
                 --sqvm->_nnativecalls;
                 return 1;
             }
@@ -2315,7 +2315,7 @@ exeption_restore:
             int localCalltype;
             SQObject* arg1Obj = &sqvm->ci->closure._VAL.asClosure->objectPointer_C0[Instruction->arg1];
             int newStackbase = sqvm->_stackbase + (unsigned int)(unsigned __int16)Instruction->arg2;
-            bool argTypeCheck = Instruction->op == 107;
+            bool argTypeCheck = Instruction->op == _OP_FASTCALL_NATIVE_ENV_ARGTYPECHECK;
             SQObject res; //v360
             res._Type = OT_NULL;
             res._VAL.asInteger = 0;
@@ -2334,7 +2334,7 @@ exeption_restore:
             {
                 sqvm->_suspended = 1;
                 sqvm->_suspended_target = Instruction->output;
-                sqvm->field_114 = traps;
+                sqvm->trapAmount = traps;
                 sqvm->_suspended_root = sqvm->ci->_root;
                 sqvm->_suspend_varargs = *(&sqvm->ci->_root + 1);
                 if (*(&sqvm->_suspend_varargs + 1) == 0)
@@ -2343,7 +2343,7 @@ exeption_restore:
                     sq_copyObject(outres, sqvm->_object_pointer_120);
                 *(&sqvm->_suspend_varargs + 1) = 0;
                 DECREMENT_REFERENCECOUNT((&res));
-                *(_QWORD*)&sqvm->sharedState->gap_50[16864] = savedSharedState;
+                sharedState->_currentThreadMaybe = savedSharedState;
                 --sqvm->_nnativecalls;
                 return 1;
 
@@ -2357,7 +2357,7 @@ exeption_restore:
             continue; }
 
         case _OP_LOADGLOBALARRAY: {
-            SQObject* source = (SQObject*)&sqvm->sharedState->gap_50[16472];
+            SQObject* source = (SQObject*)&sharedState->_gobalsStructType;//TODO has to be tested if it is array
             SQObject* target = &sqvm->_stackOfCurrentFunction[Instruction->output];
             INCREMENT_REFERENCECOUNT(source);
             DECREMENT_REFERENCECOUNT(target);
@@ -2368,7 +2368,7 @@ exeption_restore:
 
 
             SQObject* target = &sqvm->_stackOfCurrentFunction[Instruction->output];
-            SQObject* arg1Obj = (SQObject*)((*(_QWORD*)&sqvm->sharedState->gap_50[16480]) + 16 * Instruction->arg1 + 56);
+            SQObject* arg1Obj = &sharedState->_globalsStruct->data[Instruction->arg1];
             INCREMENT_REFERENCECOUNT(arg1Obj);
             DECREMENT_REFERENCECOUNT(target);
             *target = *arg1Obj;
@@ -2376,15 +2376,14 @@ exeption_restore:
 
             continue; }
         case _OP_SETGLOBAL: {
-
-            SQObject* target = (SQObject*)((*(_QWORD*)&sqvm->sharedState->gap_50[16480]) + 16 * Instruction->arg1 + 56);
+            SQObject* target = sharedState->_globalsStruct->data[Instruction->arg1];
             SQObject* arg2Obj = &sqvm->_stackOfCurrentFunction[(unsigned __int16)Instruction->arg2];
             INCREMENT_REFERENCECOUNT(arg2Obj);
             DECREMENT_REFERENCECOUNT(target);
             *target = *arg2Obj;
             continue; }
         case _OP_COMPOUND_ARITH_GLOBAL: {
-            SQObject* arg1Obj = (SQObject*)(16i64 * Instruction->arg1 + (*(_QWORD*)&sqvm->sharedState->gap_50[16480]) + 56i64);
+            SQObject* arg1Obj = sharedState->_globalsStruct->data[Instruction->arg1];
             if (!sub_2B6C0(sqvm, (unsigned __int16)Instruction->arg3, arg1Obj, arg1Obj, &sqvm->_stackOfCurrentFunction[(unsigned __int16)Instruction->arg2])) {
                 goto label_errorHandler;
             }
@@ -2423,7 +2422,7 @@ exeption_restore:
             target->_VAL.asStructInstance = (SQStructInstance*)sub_63E00(
                 sqvm->sharedState,
                 Instruction->arg1,
-                *(_DWORD**)(*(_QWORD*)(sqvm->ci->closure._VAL.asInteger + 208) + 8 * (unsigned __int16)Instruction->arg2));
+                *(_DWORD**)(*(_QWORD*)(sqvm->ci->closure._VAL.asClosure->gap_C8[8] + 8 * (unsigned __int16)Instruction->arg2)));
             INCREMENT_REFERENCECOUNT(target);
             continue; }
         case _OP_GETSUBSTRUCT: {
@@ -2519,7 +2518,7 @@ exeption_restore:
                     spdlog::info("Array values before C6F0{:X}", (long long)targetArray->_values);
                     sub_C6F0(&targetArray->_values, targetArray->_field_38);
             }
-            int* value = *(int**)(*(_QWORD*)(sqvm->ci->closure._VAL.asInteger + 208) + 8i64 * (unsigned __int16)Instruction->arg2); //this is a closure but dont know the field this is a hacky fix
+            int* value = *(int**)(*(_QWORD*)(&sqvm->ci->closure._VAL.asClosure->gap_C8[8]) + 8i64 * (unsigned __int16)Instruction->arg2); //this is a closure but dont know the field this is a hacky fix
             if (targetArray->_field_38 >= arg1Obj->_VAL.asInteger)
             {
                 continue;
@@ -2549,7 +2548,7 @@ label_errorHandler: {
         DECREMENT_REFERENCECOUNT((&sqvm->_lasterror));
         sqvm->_lasterror = currentError;
         DECREMENT_REFERENCECOUNT((&currentError));
-        *(_QWORD*)&sqvm->sharedState->gap_50[16864] = savedSharedState;
+        sqvm->sharedState->_currentThreadMaybe = savedSharedState;
         --sqvm->_nnativecalls;
         return 0;
     }
@@ -2638,7 +2637,7 @@ label_errorHandler: {
     sqvm->_lasterror = currentError;
     DECREMENT_REFERENCECOUNT((&currentError));
 
-    *(_QWORD*)&sqvm->sharedState->gap_50[16864] = savedSharedState;
+    sharedState->_currentThreadMaybe = savedSharedState;
     --sqvm->_nnativecalls;
     return 0;
     }
