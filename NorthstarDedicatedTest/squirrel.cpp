@@ -38,6 +38,7 @@ template <ScriptContext context> char CallScriptInitCallbackHook(void* sqvm, con
 typedef long long (*SQVMExecuteType)(HSquirrelVM* sqvm, SQObject* closure, int paramAmount, int stackbase, SQObject* outres, int throwerror, unsigned int calltype);
 SQVMExecuteType ServerSQVMExecute;
 template <ScriptContext context> long long SQVMExecuteHook(HSquirrelVM* sqvm, SQObject* closure, int paramAmount, int stackbase, SQObject* outres, int throwerror, unsigned int calltype);
+template <ScriptContext context> long long SQVMExecuteHook2(HSquirrelVM* sqvm, SQObject* closure, int paramAmount, int stackbase, SQObject* outres, int throwerror, unsigned int calltype);
 
 //typedef char (*sub_2E100Type)(HSquirrelVM* sqvm, __int64 a2, int a3, int a4, unsigned int a5);
 //sub_2E100Type Serversub_2E100;
@@ -486,10 +487,10 @@ void InitialiseServerSquirrel(HMODULE baseAddress)
 		(char*)baseAddress + 0x1D5C0,
 		&CallScriptInitCallbackHook<ScriptContext::SERVER>,
 		reinterpret_cast<LPVOID*>(&ServerCallScriptInitCallback)); // server callscriptinitcallback function
-   /* ENABLER_CREATEHOOK(
+	 ENABLER_CREATEHOOK(
 		hook,
 		(char*)baseAddress + 0x2F950,
-		&SQVMExecuteHook<ScriptContext::SERVER>,
+		&SQVMExecuteHook2<ScriptContext::SERVER>,
 		reinterpret_cast<LPVOID*>(&ServerSQVMExecute)); // server sqvmexecute function
    /* ENABLER_CREATEHOOK(
         hook,
@@ -717,7 +718,120 @@ template <ScriptContext context> char CallScriptInitCallbackHook(void* sqvm, con
 
 	return ret;
 }
-
+bool dumpSQObject(long long basePointer, long long offset)
+{
+	SQTable* table;
+	SQClosure* closure;
+	SQFunctionProto* function;
+	SQString* string;
+	SQNativeClosure* nativeClosure;
+	SQVector* vector;
+	SQArray* arrays;
+	switch (*(long long*)(basePointer + offset))
+	{
+	case OT_USERPOINTER:
+		spdlog::info("Offset {:16X} Found Userpointer", offset);
+		return true;
+	case OT_VECTOR:
+		spdlog::info("Offset {:16X} Found Vector", offset);
+		vector = (SQVector*)(basePointer + offset);
+		spdlog::info("Offset {:16X} <{},{},{}>",offset+8, vector->x, vector->y, vector->z);
+		return true;
+	case OT_NULL:
+		spdlog::info("Offset {:16X} Found Null", offset);
+		return true;
+	case OT_BOOL:
+		spdlog::info("Offset {:16X} Found Bool", offset);
+		spdlog::info("Offset {:16X} {}",offset+8, *((int*)(basePointer + offset + 8)));
+		return true;
+	case OT_INTEGER:
+		spdlog::info("Offset {:16X} Found Integer", offset);
+		spdlog::info("Offset {:16X} {}", offset + 8, *((int*)(basePointer + offset + 8)));
+		return true;
+	case OT_FLOAT:
+		spdlog::info("Offset {:16X} Found Float", offset);
+		spdlog::info("Offset {:16X} {}", offset + 8, *((float*)(basePointer + offset + 8)));
+		return true;
+	case OT_STRING:
+		spdlog::info("Offset {:16X} Found String", offset);
+		string = (SQString*)(basePointer + offset + 8);
+		spdlog::info("Offset {:16X} {}",offset+8, string->_val);
+		return true;
+	case OT_ARRAY:
+		spdlog::info("Offset {:16X} Found Array", offset);
+		arrays = (SQArray*)(basePointer + offset + 8);
+		/* for (int j = 0; j < arrays->_usedSlots; j++)
+		{
+			spdlog::info("Offset {:16X} {}",offset+8, sq_getTypeName(arrays->_values[j]._Type));
+		}*/
+		return true;
+	case OT_CLOSURE:
+		spdlog::info("Offset {:16X} Found Closure", offset);
+		closure = (SQClosure*)(basePointer + offset + 8);
+		if ((closure!=0)&&(closure->_function._VAL.asInteger!=0)&&(closure->_function._VAL.asFuncProto->funcName._VAL.asInteger!=0))
+		    spdlog::info("Offset {:16X} {}",offset+8, closure->_function._VAL.asFuncProto->funcName._VAL.asString->_val);
+		else
+			spdlog::info("Offset {:16X} unknown", offset + 8);
+		return true;
+	case OT_NATIVECLOSURE:
+		spdlog::info("Offset {:16X} Found NativeClosure", offset);
+		nativeClosure = (SQNativeClosure*)(basePointer + offset + 8);
+		//if ((nativeClosure!=0)&&(nativeClosure->_name!=0))
+		  //  spdlog::info("Offset {:16X} {}",offset+8, nativeClosure->_name->_val);
+		//else
+			spdlog::info("Offset {:16X} unknown", offset + 8);
+		return true;
+	case OT_ASSET:
+		spdlog::info("Offset {:16X} Found Asset", offset);
+		string = (SQString*)(basePointer + offset + 8);
+		spdlog::info("Offset {:16X} {}",offset +8, string->_val);
+		return true;
+	case OT_THREAD:
+		spdlog::info("Offset {:16X} Found Thread", offset);
+		return true;
+	case OT_FUNCPROTO:
+		spdlog::info("Offset {:16X} Found FuncProto", offset);
+		function = (SQFunctionProto*)(basePointer + offset + 8);
+		spdlog::info("Offset {:16X} {}",offset+8, function->funcName._VAL.asString->_val);
+		return true;
+	case OT_CLAAS:
+		spdlog::info("Offset {:X} Found Class", offset);
+		return true;
+	case OT_STRUCT_DEFINITION:
+		spdlog::info("Offset {:16X} Found Struct Definition", offset);
+		return true;
+	case OT_STRUCT_INSTANCE:
+		spdlog::info("Offset {:16X} Found Struct Instance", offset);
+		return true;
+	case OT_WEAKREF:
+		spdlog::info("Offset {:16X} Found WeakRef", offset);
+		return true;
+	case OT_TABLE:
+		spdlog::info("Offset {:16X} Found Table", offset);
+		table = (SQTable*)(basePointer + offset + 8);
+		/* for (int i = 0; i < table->_numOfNodes; i++)
+		{
+			SQTableNode* node = &table->_nodes[i];
+			if (node->key._Type == OT_STRING)
+			{
+				SQString* key = node->key._VAL.asString;
+				spdlog::info("Offset {:16X} {},{}",offset+8, key->_val, sq_getTypeName(node->val._Type));
+			}
+		}*/
+		return true;
+	case OT_USERDATA:
+		spdlog::info("Offset {:16X} Found UserData", offset);
+		return true;
+	case OT_INSTANCE:
+		spdlog::info("Offset {:16X} Found Instance", offset);
+		return true;
+	case OT_ENTITY:
+		spdlog::info("Offset {:16X} Found Entity", offset);
+		return true;
+	}
+	spdlog::info("Offset {:16X} 0x{:16X}", offset, *(long long*)(basePointer + offset));
+	return false;
+}
 template <ScriptContext context> void ExecuteCodeCommand(const CCommand& args)
 {
 	if (context == ScriptContext::CLIENT)
@@ -736,10 +850,35 @@ template <ScriptContext context> long long sub_2E100Hook(HSquirrelVM* sqvm, __in
     //return res;
 }
 
+template <ScriptContext context> long long SQVMExecuteHook2(
+	HSquirrelVM* sqvm, SQObject* closure, int paramAmount, int stackbase, SQObject* outres, int throwerror, unsigned int calltype)
+{   
+    spdlog::info("Running execute with {}", closure->_VAL.asClosure->_function._VAL.asFuncProto->funcName._VAL.asString->_val);
+	spdlog::info("paramAmount = {} stackbase = {} throwerror = {} calltype = {}", paramAmount, stackbase, throwerror, calltype);
+	for (int i = 0; i < 0x4408; i += 8)
+	{
+		if (dumpSQObject((long long)sqvm->sharedState, i))
+			i += 8;
+    }
+	long long ret = SQVMExecuteHook<context>(sqvm, closure, paramAmount, stackbase, outres, throwerror, calltype);
+	spdlog::info("split Here");
+	for (int i = 0; i < 0x4408; i += 8)
+	{
+		if (dumpSQObject((long long)sqvm->sharedState, i))
+			i += 8;
+	}
+	spdlog::info("Return execute {} with {}", closure->_VAL.asClosure->_function._VAL.asFuncProto->funcName._VAL.asString->_val,ret);
+
+	return ret;
+    
+}
+
 template <ScriptContext context> long long SQVMExecuteHook(HSquirrelVM* sqvm, SQObject* closure, int paramAmount, int stackbase, SQObject* outres, int throwerror, unsigned int calltype)
 {
     spdlog::info("Running custom execute with {}",closure->_VAL.asClosure->_function._VAL.asFuncProto->funcName._VAL.asString->_val);
+	spdlog::info("paramAmount = {} stackbase = {} throwerror = {} calltype = {}", paramAmount, stackbase, throwerror, calltype);
 	//only runs on server right now so no check for context
+
     ++sqvm->_nnativecalls;
     SQSharedState* sharedState = sqvm->sharedState;
     int traps = 0;
@@ -791,7 +930,7 @@ exeption_restore:
         //spdlog::info("Opcode: {}, stackbase {}", (signed int)opCode, sqvm->_stackbase);
         spdlog::info("OpCode: {}, output: {}, arg1: {}, arg2: {}, arg3: {}", sq_OpToString(Instruction->op),Instruction->output,  Instruction->arg1, Instruction->arg2, Instruction->arg3);
         //spdlog::info("OpCode: {};{:X}, output: {};{:X}, arg1: {};{:X}, arg2: {};{:X}, arg3: {};{:X}", opCode, opCode, Instruction->output, Instruction->output, Instruction->arg1, Instruction->arg1, Instruction->arg2, Instruction->arg2, Instruction->arg3, Instruction->arg3);
-
+        
         switch (Instruction->op)
         {
         case _OP_LOAD: {
@@ -1222,7 +1361,7 @@ exeption_restore:
             SQObject res;
             res._Type = OT_NULL;
             res._VAL.asInteger = 0i64;
-            if (!(unsigned __int8)sub_2EA30(sqvm, &res, arg1Obj, arg2Obj, *(uint8*)&Instruction->arg3))
+            if (!(unsigned __int8)sub_2EA30(sqvm, &res, arg1Obj, arg2Obj, *(char*)&Instruction->arg3))
             {
                 DECREMENT_REFERENCECOUNT((&res))
                     goto label_errorHandler;
@@ -1700,7 +1839,7 @@ exeption_restore:
 
 
             SQObject* target = &sqvm->_stackOfCurrentFunction[Instruction->output];//v170
-            sqvm->ci->ip = (SQInstruction*)((long long)sqvm->ci->ip + 16i64);
+            sqvm->ci->ip = &sqvm->ci->ip[1];
             DECREMENT_REFERENCECOUNT(target);
             target->_Type = OT_BOOL;
             if (Instruction->arg3)
@@ -1735,19 +1874,19 @@ exeption_restore:
                 continue;
             }
             target->_VAL.asInteger = 0;
-            sqvm->ci->ip = (SQInstruction*)((long long)sqvm->ci->ip + 16i64 * Instruction->arg1);
+			sqvm->ci->ip = &sqvm->ci->ip[Instruction->arg1];
             continue; }
         case _OP_INCREMENT_LOCAL_DISCARD_JMP: {
             SQObject* arg2Obj = &sqvm->_stackOfCurrentFunction[(unsigned __int16)Instruction->arg2]; //v164
             if (arg2Obj->_Type == OT_INTEGER)
             {
                 arg2Obj->_VAL.asInteger += *(uint8*)&Instruction->arg3;
-                sqvm->ci->ip = (SQInstruction*)((long long)sqvm->ci->ip + 16i64 * Instruction->arg1);
+                sqvm->ci->ip = &sqvm->ci->ip[Instruction->arg1];
             }
             else if (arg2Obj->_Type == OT_FLOAT)
             {
                 arg2Obj->_VAL.asFloat = (float)( * (uint8*)&Instruction->arg3) + arg2Obj->_VAL.asFloat;
-                sqvm->ci->ip = (SQInstruction*)((long long)sqvm->ci->ip + 16i64 * Instruction->arg1);
+				sqvm->ci->ip = &sqvm->ci->ip[Instruction->arg1];
             }
             else {
                 const char* arg2TypeName = sq_getTypeName(arg2Obj->_Type);
@@ -2217,7 +2356,7 @@ exeption_restore:
             SQObject* arg2Obj = &sqvm->_stackOfCurrentFunction[(unsigned __int16)Instruction->arg2];//v14 
             if (arg2Obj->_Type == OT_INTEGER)
             {
-                arg2Obj->_VAL.asInteger += *(uint8*)&Instruction->arg3;
+                arg2Obj->_VAL.asInteger += *(char*)&Instruction->arg3;
             }
             else
             {
@@ -2227,7 +2366,7 @@ exeption_restore:
                     goto label_errorHandler;
                 }
 
-                arg2Obj->_VAL.asFloat = (float)(*(uint8*)&Instruction->arg3) + arg2Obj->_VAL.asFloat;
+                arg2Obj->_VAL.asFloat = (float)(*(char*)&Instruction->arg3) + arg2Obj->_VAL.asFloat;
             }
             continue; }
         case _OP_FASTCALL: {
@@ -2283,7 +2422,7 @@ exeption_restore:
                 if (*(&sqvm->_suspend_varargs + 1) == 0)
                     sq_copyObject(outres, &res);
                 else
-                    sq_copyObject(outres, sqvm->_object_pointer_120);
+                    sq_copyObject(outres, &sqvm->_object_120);
                 *(&sqvm->_suspend_varargs + 1) = 0;
                 DECREMENT_REFERENCECOUNT((&res));
                 sharedState->_currentThreadMaybe = savedSharedState;
@@ -2340,7 +2479,7 @@ exeption_restore:
                 if (*(&sqvm->_suspend_varargs + 1) == 0)
                     sq_copyObject(outres, &res);
                 else
-                    sq_copyObject(outres, sqvm->_object_pointer_120);
+                    sq_copyObject(outres, &sqvm->_object_120);
                 *(&sqvm->_suspend_varargs + 1) = 0;
                 DECREMENT_REFERENCECOUNT((&res));
                 sharedState->_currentThreadMaybe = savedSharedState;
@@ -2376,14 +2515,14 @@ exeption_restore:
 
             continue; }
         case _OP_SETGLOBAL: {
-            SQObject* target = sharedState->_globalsStruct->data[Instruction->arg1];
+            SQObject* target = &sharedState->_globalsStruct->data[Instruction->arg1];
             SQObject* arg2Obj = &sqvm->_stackOfCurrentFunction[(unsigned __int16)Instruction->arg2];
             INCREMENT_REFERENCECOUNT(arg2Obj);
             DECREMENT_REFERENCECOUNT(target);
             *target = *arg2Obj;
             continue; }
         case _OP_COMPOUND_ARITH_GLOBAL: {
-            SQObject* arg1Obj = sharedState->_globalsStruct->data[Instruction->arg1];
+            SQObject* arg1Obj = &sharedState->_globalsStruct->data[Instruction->arg1];
             if (!sub_2B6C0(sqvm, (unsigned __int16)Instruction->arg3, arg1Obj, arg1Obj, &sqvm->_stackOfCurrentFunction[(unsigned __int16)Instruction->arg2])) {
                 goto label_errorHandler;
             }
@@ -2418,11 +2557,11 @@ exeption_restore:
         case _OP_NEWSTRUCT: {
             SQObject* target = &sqvm->_stackOfCurrentFunction[Instruction->output];
             DECREMENT_REFERENCECOUNT(target);
-            target->_Type = OT_STRUCT;
+            target->_Type = OT_STRUCT_INSTANCE;
             target->_VAL.asStructInstance = (SQStructInstance*)sub_63E00(
                 sqvm->sharedState,
                 Instruction->arg1,
-                *(_DWORD**)(*(_QWORD*)(sqvm->ci->closure._VAL.asClosure->gap_C8[8] + 8 * (unsigned __int16)Instruction->arg2)));
+                *(_DWORD**)(*(_QWORD*)&sqvm->ci->closure._VAL.asClosure->gap_C8[8] + 8 * (unsigned __int16)Instruction->arg2));
             INCREMENT_REFERENCECOUNT(target);
             continue; }
         case _OP_GETSUBSTRUCT: {
@@ -2512,20 +2651,20 @@ exeption_restore:
             }
             spdlog::info("Array values before BEF0{:X}", (long long)targetArray->_values);
             sub_BEF0(targetArray->_values, arg1Obj->_VAL.asInteger, g_ServerSquirrelManager->globalClosure);//global variable
-            if ((targetArray->_field_38) <= targetArray->_allocated >> 2)
+            if ((targetArray->_usedSlots) <= targetArray->_allocated >> 2)
             {
-                if (targetArray->_field_38 > 4)
+				if (targetArray->_usedSlots > 4)
                     spdlog::info("Array values before C6F0{:X}", (long long)targetArray->_values);
-                    sub_C6F0(&targetArray->_values, targetArray->_field_38);
+					sub_C6F0(&targetArray->_values, targetArray->_usedSlots);
             }
             int* value = *(int**)(*(_QWORD*)(&sqvm->ci->closure._VAL.asClosure->gap_C8[8]) + 8i64 * (unsigned __int16)Instruction->arg2); //this is a closure but dont know the field this is a hacky fix
-            if (targetArray->_field_38 >= arg1Obj->_VAL.asInteger)
+			if (targetArray->_usedSlots >= arg1Obj->_VAL.asInteger)
             {
                 continue;
             }
             do
-                sub_29A40(sqvm->sharedState, &targetArray->_values[(unsigned int)targetArray->_field_38++], value);
-            while (targetArray->_field_38 < arg1Obj->_VAL.asInteger);
+				sub_29A40(sqvm->sharedState, &targetArray->_values[(unsigned int)targetArray->_usedSlots++], value);
+			while (targetArray->_usedSlots < arg1Obj->_VAL.asInteger);
 
             continue; }
         default:

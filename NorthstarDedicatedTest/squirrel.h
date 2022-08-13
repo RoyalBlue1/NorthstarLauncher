@@ -20,7 +20,7 @@ typedef unsigned int uint;
 #define _WORD  uint16
 #define _DWORD uint32
 #define _QWORD uint64
-#define SLOBYTE(x)   (*((int8*)&(x)))
+#define SLOBYTE(x)   (*((char*)&(x)))
 #define HIDWORD(x)  (*((_DWORD*)&(x)+1))
 #define LODWORD(x)  (*((_DWORD*)&(x)))
 
@@ -63,9 +63,10 @@ struct SQNativeClosure;
 struct SQArray;
 struct SQInstruction;
 struct HSquirrelVM;
+struct SQTableNode;
 
 /* 127 */
-enum SQObjectType : __int32
+enum SQObjectFlags : __int32
 {
 	_RT_NULL = 0x1,
 	_RT_INTEGER = 0x2,
@@ -78,22 +79,28 @@ enum SQObjectType : __int32
 	_RT_CLOSURE = 0x100,
 	_RT_NATIVECLOSURE = 0x200,
 	_RT_GENERATOR = 0x400,
-	OT_USERPOINTER = 0x800,
 	_RT_USERPOINTER = 0x800,
 	_RT_THREAD = 0x1000,
 	_RT_FUNCPROTO = 0x2000,
 	_RT_CLASS = 0x4000,
 	_RT_INSTANCE = 0x8000,
 	_RT_WEAKREF = 0x10000,
-	OT_VECTOR = 0x40000,
 	SQOBJECT_CANBEFALSE = 0x1000000,
-	OT_NULL = 0x1000001,
-	OT_BOOL = 0x1000008,
+	SQOBJECT_REF_COUNTED = 0x8000000,
 	SQOBJECT_DELEGABLE = 0x2000000,
 	SQOBJECT_NUMERIC = 0x4000000,
+
+};
+
+enum SQObjectType : __int32
+{
+	OT_VAR = 0,
+	OT_USERPOINTER = 0x800,
+	OT_VECTOR = 0x40000,
+	OT_NULL = 0x1000001,
+	OT_BOOL = 0x1000008,
 	OT_INTEGER = 0x5000002,
 	OT_FLOAT = 0x5000004,
-	SQOBJECT_REF_COUNTED = 0x8000000,
 	OT_STRING = 0x8000010,
 	OT_ARRAY = 0x8000040,
 	OT_CLOSURE = 0x8000100,
@@ -102,13 +109,15 @@ enum SQObjectType : __int32
 	OT_THREAD = 0x8001000,
 	OT_FUNCPROTO = 0x8002000,
 	OT_CLAAS = 0x8004000,
-	OT_STRUCT = 0x8200000,
+	OT_STRUCT_DEFINITION = 0x8100000,
+	OT_STRUCT_INSTANCE = 0x8200000,
 	OT_WEAKREF = 0x8010000,
 	OT_TABLE = 0xA000020,
 	OT_USERDATA = 0xA000080,
 	OT_INSTANCE = 0xA008000,
 	OT_ENTITY = 0xA400000,
 };
+
 
 /* 156 */
 union __declspec(align(8)) SQObjectValue
@@ -138,8 +147,8 @@ struct __declspec(align(8)) SQObject
 struct __declspec(align(8)) SQString
 {
 	__int64* vftable;
-	__int32 uiRef;
 	__int32 uiRef1;
+	__int32 uiRef;
 	SQString* _next_maybe;
 	SQSharedState* sharedState;
 	__int32 length;
@@ -151,23 +160,24 @@ struct __declspec(align(8)) SQString
 /* 137 */
 struct __declspec(align(8)) SQTable
 {
-	__int64* vftable;
-	uint8 gap_08[4];
+	void* vftable;
+	_BYTE gap_08[4];
 	__int32 uiRef;
-	uint8 gap_10[8];
+	_BYTE gap_10[8];
 	void* pointer_18;
 	void* pointer_20;
 	void* _sharedState;
 	__int64 field_30;
-	void* pointer_38;
+	SQTableNode* _nodes;
 	__int32 _numOfNodes;
 	__int32 size;
 	__int32 field_48;
 	__int32 _usedNodes;
-	uint8 _gap_50[20];
+	_BYTE _gap_50[20];
 	__int32 field_64;
-	uint8 _gap_68[80];
+	_BYTE _gap_68[80];
 };
+
 
 /* 140 */
 struct __declspec(align(8)) SQClosure
@@ -221,7 +231,9 @@ struct SQStructDef
 struct SQStructInstance
 {
 	void* vftable;
-	uint8 gap_8[16];
+	uint8 gap_8[4];
+	int uiRef;
+	uint8 gap_10[8];
 	void* pointer_18;
 	uint8 gap_20[8];
 	SQSharedState* _sharedState;
@@ -245,9 +257,19 @@ struct SQSharedState
 {
 	_BYTE gap_0[72];
 	void* unknown;
-	_BYTE gap_50[16376];
+	_BYTE gap_50[16344];
+	SQObjectType _unknownTableType00;
+	__int64 _unknownTableValue00;
+	_BYTE gap_4038[16];
 	StringTable* _stringTable;
-	_BYTE gap_4050[88];
+	_BYTE gap_4050[32];
+	SQObjectType _unknownTableType0;
+	__int64 _unknownTableValue0;
+	SQObjectType _unknownObjectType1;
+	__int64 _unknownObjectValue1;
+	_BYTE gap_4090[8];
+	SQObjectType _unknownArrayType2;
+	__int64 _unknownArrayValue2;
 	SQObjectType _gobalsStructType;
 	SQStructInstance* _globalsStruct;
 	_BYTE gap_40B8[16];
@@ -288,11 +310,49 @@ struct SQSharedState
 	SQTable* unknownThread;
 	SQObjectType _tableNativeFunctionsType;
 	SQTable* _tableNativeFunctions;
-	_BYTE gap_4280[232];
+	SQObjectType _unknownTableType4;
+	__int64 _unknownObjectValue4;
+	SQObjectType _unknownObjectType5;
+	__int64 _unknownObjectValue5;
+	SQObjectType _unknownObjectType6;
+	__int64 _unknownObjectValue6;
+	SQObjectType _unknownObjectType7;
+	__int64 _unknownObjectValue7;
+	SQObjectType _unknownObjectType8;
+	__int64 _unknownObjectValue8;
+	SQObjectType _unknownObjectType9;
+	__int64 _unknownObjectValue9;
+	SQObjectType _unknownObjectType10;
+	__int64 _unknownObjectValue10;
+	SQObjectType _unknownObjectType11;
+	__int64 _unknownObjectValue11;
+	SQObjectType _unknownObjectType12;
+	__int64 _unknownObjectValue12;
+	SQObjectType _unknownObjectType13;
+	__int64 _unknownObjectValue13;
+	SQObjectType _unknownObjectType14;
+	__int64 _unknownObjectValue14;
+	SQObjectType _unknownObjectType15;
+	__int64 _unknownObjectValue15;
+	_BYTE gap_4340[16];
+	void* printFunction;
+	_BYTE gap_4358[16];
 	void* logEntityFunction;
-	_BYTE gap_4370[15000];
+	_BYTE gap_4370[40];
+	SQObjectType _waitStringType;
+	SQString* _waitStringValue;
+	SQObjectType _SpinOffAndWaitForStringType;
+	SQString* _SpinOffAndWaitForStringValue;
+	SQObjectType _SpinOffAndWaitForSoloStringType;
+	SQString* _SpinOffAndWaitForSoloStringValue;
+	SQObjectType _SpinOffStringType;
+	SQString* _SpinOffStringValue;
+	SQObjectType _SpinOffDelayedStringType;
+	SQString* _SpinOffDelayedStringValue;
+	_BYTE gap_43E8[8];
+	bool enableDebugInfo;
+	_BYTE gap_43F1[23];
 };
-
 
 /* 149 */
 struct StringTable
@@ -341,7 +401,8 @@ struct __declspec(align(8)) HSquirrelVM
 	__int32 _suspended_target;
 	__int32 trapAmount;
 	__int32 _suspend_varargs;
-	SQObject* _object_pointer_120;
+	__int32 _unknown_field_11C;
+	SQObject _object_120;
 };
 
 /* 136 */
@@ -544,12 +605,18 @@ struct SQArray
 {
 	void* vftable;
 	__int32 uiRef;
-	uint8 gap_24[36];
+	_BYTE gap_24[36];
 	SQObject* _values;
-	__int32 _field_38;
+	__int32 _usedSlots;
 	__int32 _allocated;
 };
 
+struct SQTableNode
+{
+	SQObject val;
+	SQObject key;
+	SQTableNode* next;
+};
 
 #define INCREMENT_REFERENCECOUNT(val) if((val->_Type & SQOBJECT_REF_COUNTED) != 0) ++val->_VAL.asString->uiRef;
 
