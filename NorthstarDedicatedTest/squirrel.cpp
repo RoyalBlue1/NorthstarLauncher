@@ -487,6 +487,7 @@ void InitialiseServerSquirrel(HMODULE baseAddress)
 		(char*)baseAddress + 0x1D5C0,
 		&CallScriptInitCallbackHook<ScriptContext::SERVER>,
 		reinterpret_cast<LPVOID*>(&ServerCallScriptInitCallback)); // server callscriptinitcallback function
+	
 	 ENABLER_CREATEHOOK(
 		hook,
 		(char*)baseAddress + 0x2F950,
@@ -506,341 +507,6 @@ void InitialiseServerSquirrel(HMODULE baseAddress)
 		FCVAR_GAMEDLL | FCVAR_CLIENTCMD_CAN_EXECUTE | FCVAR_CHEAT);
 }
 
-// hooks
-template <ScriptContext context> SQInteger SQPrintHook(void* sqvm, char* fmt, ...)
-{
-	va_list va;
-	va_start(va, fmt);
-
-	SQChar buf[1024];
-	int charsWritten = vsnprintf_s(buf, _TRUNCATE, fmt, va);
-
-	if (charsWritten > 0)
-	{
-		if (buf[charsWritten - 1] == '\n')
-			buf[charsWritten - 1] = '\0';
-
-		spdlog::info("[{} SCRIPT] {}", GetContextName(context), buf);
-	}
-
-	va_end(va);
-	return 0;
-}
-
-template <ScriptContext context> void* CreateNewVMHook(void* a1, ScriptContext realContext)
-{
-	void* sqvm;
-
-	if (context == ScriptContext::CLIENT)
-	{
-		sqvm = ClientCreateNewVM(a1, realContext);
-
-		if (realContext == ScriptContext::UI)
-			g_UISquirrelManager->VMCreated(sqvm);
-		else
-			g_ClientSquirrelManager->VMCreated(sqvm);
-	}
-	else if (context == ScriptContext::SERVER)
-	{
-		sqvm = ServerCreateNewVM(a1, context);
-		g_ServerSquirrelManager->VMCreated(sqvm);
-	}
-
-	spdlog::info("CreateNewVM {} {}", GetContextName(realContext), sqvm);
-	return sqvm;
-}
-
-template <ScriptContext context> void DestroyVMHook(void* a1, void* sqvm)
-{
-	ScriptContext realContext = context; // ui and client use the same function so we use this for prints
-
-	if (context == ScriptContext::CLIENT)
-	{
-		if (g_ClientSquirrelManager->sqvm == sqvm)
-			g_ClientSquirrelManager->VMDestroyed();
-		else if (g_UISquirrelManager->sqvm == sqvm)
-		{
-			g_UISquirrelManager->VMDestroyed();
-			realContext = ScriptContext::UI;
-		}
-
-		ClientDestroyVM(a1, sqvm);
-	}
-	else if (context == ScriptContext::SERVER)
-	{
-		g_ServerSquirrelManager->VMDestroyed();
-		ServerDestroyVM(a1, sqvm);
-	}
-
-	spdlog::info("DestroyVM {} {}", GetContextName(realContext), sqvm);
-}
-
-template <ScriptContext context> void ScriptCompileErrorHook(void* sqvm, const char* error, const char* file, int line, int column)
-{
-	ScriptContext realContext = context; // ui and client use the same function so we use this for prints
-	if (context == ScriptContext::CLIENT && sqvm == g_UISquirrelManager->sqvm)
-		realContext = ScriptContext::UI;
-
-	spdlog::error("{} SCRIPT COMPILE ERROR {}", GetContextName(realContext), error);
-	spdlog::error("{} line [{}] column [{}]", file, line, column);
-
-	// dont call the original since it kills game
-	// in the future it'd be nice to do an actual error with UICodeCallback_ErrorDialog here, but only if we're compiling level scripts
-	// compilestring and stuff shouldn't tho
-	// though, that also has potential to be REALLY bad if we're compiling ui scripts lol
-}
-
-template <ScriptContext context> char CallScriptInitCallbackHook(void* sqvm, const char* callback)
-{
-	char ret;
-
-	if (context == ScriptContext::CLIENT)
-	{
-		ScriptContext realContext = context; // ui and client use the same function so we use this for prints
-		bool shouldCallCustomCallbacks = false;
-
-		// since we don't hook arbitrary callbacks yet, make sure we're only doing callbacks on inits
-		if (!strcmp(callback, "UICodeCallback_UIInit"))
-		{
-			realContext = ScriptContext::UI;
-			shouldCallCustomCallbacks = true;
-		}
-		else if (!strcmp(callback, "ClientCodeCallback_MapSpawn"))
-			shouldCallCustomCallbacks = true;
-
-		// run before callbacks
-		// todo: we need to verify if RunOn is valid for current state before calling callbacks
-		if (shouldCallCustomCallbacks)
-		{
-			for (Mod mod : g_ModManager->m_loadedMods)
-			{
-				if (!mod.Enabled)
-					continue;
-
-				for (ModScript script : mod.Scripts)
-				{
-					for (ModScriptCallback modCallback : script.Callbacks)
-					{
-						if (modCallback.Context == realContext && modCallback.BeforeCallback.length())
-						{
-							spdlog::info(
-								"Running custom {} script callback \"{}\"", GetContextName(realContext), modCallback.BeforeCallback);
-							ClientCallScriptInitCallback(sqvm, modCallback.BeforeCallback.c_str());
-						}
-					}
-				}
-			}
-		}
-
-		spdlog::info("{} CodeCallback {} called", GetContextName(realContext), callback);
-		if (!shouldCallCustomCallbacks)
-			spdlog::info("Not executing custom callbacks for CodeCallback {}", callback);
-		ret = ClientCallScriptInitCallback(sqvm, callback);
-
-		// run after callbacks
-		if (shouldCallCustomCallbacks)
-		{
-			for (Mod mod : g_ModManager->m_loadedMods)
-			{
-				if (!mod.Enabled)
-					continue;
-
-				for (ModScript script : mod.Scripts)
-				{
-					for (ModScriptCallback modCallback : script.Callbacks)
-					{
-						if (modCallback.Context == realContext && modCallback.AfterCallback.length())
-						{
-							spdlog::info(
-								"Running custom {} script callback \"{}\"", GetContextName(realContext), modCallback.AfterCallback);
-							ClientCallScriptInitCallback(sqvm, modCallback.AfterCallback.c_str());
-						}
-					}
-				}
-			}
-		}
-	}
-	else if (context == ScriptContext::SERVER)
-	{
-		// since we don't hook arbitrary callbacks yet, make sure we're only doing callbacks on inits
-		bool shouldCallCustomCallbacks = !strcmp(callback, "CodeCallback_MapSpawn");
-
-		// run before callbacks
-		// todo: we need to verify if RunOn is valid for current state before calling callbacks
-		if (shouldCallCustomCallbacks)
-		{
-			for (Mod mod : g_ModManager->m_loadedMods)
-			{
-				if (!mod.Enabled)
-					continue;
-
-				for (ModScript script : mod.Scripts)
-				{
-					for (ModScriptCallback modCallback : script.Callbacks)
-					{
-						if (modCallback.Context == ScriptContext::SERVER && modCallback.BeforeCallback.length())
-						{
-							spdlog::info("Running custom {} script callback \"{}\"", GetContextName(context), modCallback.BeforeCallback);
-							ServerCallScriptInitCallback(sqvm, modCallback.BeforeCallback.c_str());
-						}
-					}
-				}
-			}
-		}
-
-		spdlog::info("{} CodeCallback {} called", GetContextName(context), callback);
-		if (!shouldCallCustomCallbacks)
-			spdlog::info("Not executing custom callbacks for CodeCallback {}", callback);
-		ret = ServerCallScriptInitCallback(sqvm, callback);
-
-		// run after callbacks
-		if (shouldCallCustomCallbacks)
-		{
-			for (Mod mod : g_ModManager->m_loadedMods)
-			{
-				if (!mod.Enabled)
-					continue;
-
-				for (ModScript script : mod.Scripts)
-				{
-					for (ModScriptCallback modCallback : script.Callbacks)
-					{
-						if (modCallback.Context == ScriptContext::SERVER && modCallback.AfterCallback.length())
-						{
-							spdlog::info("Running custom {} script callback \"{}\"", GetContextName(context), modCallback.AfterCallback);
-							ServerCallScriptInitCallback(sqvm, modCallback.AfterCallback.c_str());
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return ret;
-}
-bool dumpSQObject(long long basePointer, long long offset)
-{
-	SQTable* table;
-	SQClosure* closure;
-	SQFunctionProto* function;
-	SQString* string;
-	SQNativeClosure* nativeClosure;
-	SQVector* vector;
-	SQArray* arrays;
-	switch (*(long long*)(basePointer + offset))
-	{
-	case OT_USERPOINTER:
-		spdlog::info("Offset {:16X} Found Userpointer", offset);
-		return true;
-	case OT_VECTOR:
-		spdlog::info("Offset {:16X} Found Vector", offset);
-		vector = (SQVector*)(basePointer + offset);
-		spdlog::info("Offset {:16X} <{},{},{}>",offset+8, vector->x, vector->y, vector->z);
-		return true;
-	case OT_NULL:
-		spdlog::info("Offset {:16X} Found Null", offset);
-		return true;
-	case OT_BOOL:
-		spdlog::info("Offset {:16X} Found Bool", offset);
-		spdlog::info("Offset {:16X} {}",offset+8, *((int*)(basePointer + offset + 8)));
-		return true;
-	case OT_INTEGER:
-		spdlog::info("Offset {:16X} Found Integer", offset);
-		spdlog::info("Offset {:16X} {}", offset + 8, *((int*)(basePointer + offset + 8)));
-		return true;
-	case OT_FLOAT:
-		spdlog::info("Offset {:16X} Found Float", offset);
-		spdlog::info("Offset {:16X} {}", offset + 8, *((float*)(basePointer + offset + 8)));
-		return true;
-	case OT_STRING:
-		spdlog::info("Offset {:16X} Found String", offset);
-		string = (SQString*)(basePointer + offset + 8);
-		spdlog::info("Offset {:16X} {}",offset+8, string->_val);
-		return true;
-	case OT_ARRAY:
-		spdlog::info("Offset {:16X} Found Array", offset);
-		arrays = (SQArray*)(basePointer + offset + 8);
-		/* for (int j = 0; j < arrays->_usedSlots; j++)
-		{
-			spdlog::info("Offset {:16X} {}",offset+8, sq_getTypeName(arrays->_values[j]._Type));
-		}*/
-		return true;
-	case OT_CLOSURE:
-		spdlog::info("Offset {:16X} Found Closure", offset);
-		closure = (SQClosure*)(basePointer + offset + 8);
-		if ((closure!=0)&&(closure->_function._VAL.asInteger!=0)&&(closure->_function._VAL.asFuncProto->funcName._VAL.asInteger!=0))
-		    spdlog::info("Offset {:16X} {}",offset+8, closure->_function._VAL.asFuncProto->funcName._VAL.asString->_val);
-		else
-			spdlog::info("Offset {:16X} unknown", offset + 8);
-		return true;
-	case OT_NATIVECLOSURE:
-		spdlog::info("Offset {:16X} Found NativeClosure", offset);
-		nativeClosure = (SQNativeClosure*)(basePointer + offset + 8);
-		//if ((nativeClosure!=0)&&(nativeClosure->_name!=0))
-		  //  spdlog::info("Offset {:16X} {}",offset+8, nativeClosure->_name->_val);
-		//else
-			spdlog::info("Offset {:16X} unknown", offset + 8);
-		return true;
-	case OT_ASSET:
-		spdlog::info("Offset {:16X} Found Asset", offset);
-		string = (SQString*)(basePointer + offset + 8);
-		spdlog::info("Offset {:16X} {}",offset +8, string->_val);
-		return true;
-	case OT_THREAD:
-		spdlog::info("Offset {:16X} Found Thread", offset);
-		return true;
-	case OT_FUNCPROTO:
-		spdlog::info("Offset {:16X} Found FuncProto", offset);
-		function = (SQFunctionProto*)(basePointer + offset + 8);
-		spdlog::info("Offset {:16X} {}",offset+8, function->funcName._VAL.asString->_val);
-		return true;
-	case OT_CLAAS:
-		spdlog::info("Offset {:X} Found Class", offset);
-		return true;
-	case OT_STRUCT_DEFINITION:
-		spdlog::info("Offset {:16X} Found Struct Definition", offset);
-		return true;
-	case OT_STRUCT_INSTANCE:
-		spdlog::info("Offset {:16X} Found Struct Instance", offset);
-		return true;
-	case OT_WEAKREF:
-		spdlog::info("Offset {:16X} Found WeakRef", offset);
-		return true;
-	case OT_TABLE:
-		spdlog::info("Offset {:16X} Found Table", offset);
-		table = (SQTable*)(basePointer + offset + 8);
-		/* for (int i = 0; i < table->_numOfNodes; i++)
-		{
-			SQTableNode* node = &table->_nodes[i];
-			if (node->key._Type == OT_STRING)
-			{
-				SQString* key = node->key._VAL.asString;
-				spdlog::info("Offset {:16X} {},{}",offset+8, key->_val, sq_getTypeName(node->val._Type));
-			}
-		}*/
-		return true;
-	case OT_USERDATA:
-		spdlog::info("Offset {:16X} Found UserData", offset);
-		return true;
-	case OT_INSTANCE:
-		spdlog::info("Offset {:16X} Found Instance", offset);
-		return true;
-	case OT_ENTITY:
-		spdlog::info("Offset {:16X} Found Entity", offset);
-		return true;
-	}
-	spdlog::info("Offset {:16X} 0x{:16X}", offset, *(long long*)(basePointer + offset));
-	return false;
-}
-template <ScriptContext context> void ExecuteCodeCommand(const CCommand& args)
-{
-	if (context == ScriptContext::CLIENT)
-		g_ClientSquirrelManager->ExecuteCode(args.ArgS());
-	else if (context == ScriptContext::UI)
-		g_UISquirrelManager->ExecuteCode(args.ArgS());
-	else if (context == ScriptContext::SERVER)
-		g_ServerSquirrelManager->ExecuteCode(args.ArgS());
-}
 
 template <ScriptContext context> long long sub_2E100Hook(HSquirrelVM* sqvm, __int64 a2, int a3, int a4, unsigned int a5)
 {
@@ -850,28 +516,7 @@ template <ScriptContext context> long long sub_2E100Hook(HSquirrelVM* sqvm, __in
     //return res;
 }
 
-template <ScriptContext context> long long SQVMExecuteHook2(
-	HSquirrelVM* sqvm, SQObject* closure, int paramAmount, int stackbase, SQObject* outres, int throwerror, unsigned int calltype)
-{   
-    spdlog::info("Running execute with {}", closure->_VAL.asClosure->_function._VAL.asFuncProto->funcName._VAL.asString->_val);
-	spdlog::info("paramAmount = {} stackbase = {} throwerror = {} calltype = {}", paramAmount, stackbase, throwerror, calltype);
-	for (int i = 0; i < 0x4408; i += 8)
-	{
-		if (dumpSQObject((long long)sqvm->sharedState, i))
-			i += 8;
-    }
-	long long ret = SQVMExecuteHook<context>(sqvm, closure, paramAmount, stackbase, outres, throwerror, calltype);
-	spdlog::info("split Here");
-	for (int i = 0; i < 0x4408; i += 8)
-	{
-		if (dumpSQObject((long long)sqvm->sharedState, i))
-			i += 8;
-	}
-	spdlog::info("Return execute {} with {}", closure->_VAL.asClosure->_function._VAL.asFuncProto->funcName._VAL.asString->_val,ret);
 
-	return ret;
-    
-}
 
 template <ScriptContext context> long long SQVMExecuteHook(HSquirrelVM* sqvm, SQObject* closure, int paramAmount, int stackbase, SQObject* outres, int throwerror, unsigned int calltype)
 {
@@ -2865,4 +2510,365 @@ int sqObjectToString(char* buf, int bufLength, SQObject* obj) { //returns string
         length = sprintf_s(buf, bufLength, "Object of type %s with integer value %p", typeName, (void*)obj->_VAL.asInteger);
     }
     return length;
+}
+
+bool dumpSQObject(long long basePointer, long long offset)
+{
+	SQTable* table;
+	SQClosure* closure;
+	SQFunctionProto* function;
+	SQString* string;
+	SQNativeClosure* nativeClosure;
+	SQVector* vector;
+	SQArray* arrays;
+	switch (*(long long*)(basePointer + offset))
+	{
+	case OT_USERPOINTER:
+		spdlog::info("Offset {:16X} Found Userpointer", offset);
+		return true;
+	case OT_VECTOR:
+		spdlog::info("Offset {:16X} Found Vector", offset);
+		vector = (SQVector*)(basePointer + offset);
+		spdlog::info("Offset {:16X} <{},{},{}>", offset + 8, vector->x, vector->y, vector->z);
+		return true;
+	case OT_NULL:
+		spdlog::info("Offset {:16X} Found Null", offset);
+		return true;
+	case OT_BOOL:
+		spdlog::info("Offset {:16X} Found Bool", offset);
+		spdlog::info("Offset {:16X} {}", offset + 8, *((int*)(basePointer + offset + 8)));
+		return true;
+	case OT_INTEGER:
+		spdlog::info("Offset {:16X} Found Integer", offset);
+		spdlog::info("Offset {:16X} {}", offset + 8, *((int*)(basePointer + offset + 8)));
+		return true;
+	case OT_FLOAT:
+		spdlog::info("Offset {:16X} Found Float", offset);
+		spdlog::info("Offset {:16X} {}", offset + 8, *((float*)(basePointer + offset + 8)));
+		return true;
+	case OT_STRING:
+		spdlog::info("Offset {:16X} Found String", offset);
+		string = (SQString*)(basePointer + offset + 8);
+		spdlog::info("Offset {:16X} {}", offset + 8, string->_val);
+		return true;
+	case OT_ARRAY:
+		spdlog::info("Offset {:16X} Found Array", offset);
+		arrays = (SQArray*)(basePointer + offset + 8);
+		/* for (int j = 0; j < arrays->_usedSlots; j++)
+		{
+			spdlog::info("Offset {:16X} {}",offset+8, sq_getTypeName(arrays->_values[j]._Type));
+		}*/
+		return true;
+	case OT_CLOSURE:
+		spdlog::info("Offset {:16X} Found Closure", offset);
+		closure = (SQClosure*)(basePointer + offset + 8);
+		if ((closure != 0) && (closure->_function._VAL.asInteger != 0) &&
+			(closure->_function._VAL.asFuncProto->funcName._VAL.asInteger != 0))
+			spdlog::info("Offset {:16X} {}", offset + 8, closure->_function._VAL.asFuncProto->funcName._VAL.asString->_val);
+		else
+			spdlog::info("Offset {:16X} unknown", offset + 8);
+		return true;
+	case OT_NATIVECLOSURE:
+		spdlog::info("Offset {:16X} Found NativeClosure", offset);
+		nativeClosure = (SQNativeClosure*)(basePointer + offset + 8);
+		// if ((nativeClosure!=0)&&(nativeClosure->_name!=0))
+		//   spdlog::info("Offset {:16X} {}",offset+8, nativeClosure->_name->_val);
+		// else
+		spdlog::info("Offset {:16X} unknown", offset + 8);
+		return true;
+	case OT_ASSET:
+		spdlog::info("Offset {:16X} Found Asset", offset);
+		string = (SQString*)(basePointer + offset + 8);
+		spdlog::info("Offset {:16X} {}", offset + 8, string->_val);
+		return true;
+	case OT_THREAD:
+		spdlog::info("Offset {:16X} Found Thread", offset);
+		return true;
+	case OT_FUNCPROTO:
+		spdlog::info("Offset {:16X} Found FuncProto", offset);
+		function = (SQFunctionProto*)(basePointer + offset + 8);
+		spdlog::info("Offset {:16X} {}", offset + 8, function->funcName._VAL.asString->_val);
+		return true;
+	case OT_CLAAS:
+		spdlog::info("Offset {:X} Found Class", offset);
+		return true;
+	case OT_STRUCT_DEFINITION:
+		spdlog::info("Offset {:16X} Found Struct Definition", offset);
+		return true;
+	case OT_STRUCT_INSTANCE:
+		spdlog::info("Offset {:16X} Found Struct Instance", offset);
+		return true;
+	case OT_WEAKREF:
+		spdlog::info("Offset {:16X} Found WeakRef", offset);
+		return true;
+	case OT_TABLE:
+		spdlog::info("Offset {:16X} Found Table", offset);
+		table = (SQTable*)(basePointer + offset + 8);
+		/* for (int i = 0; i < table->_numOfNodes; i++)
+		{
+			SQTableNode* node = &table->_nodes[i];
+			if (node->key._Type == OT_STRING)
+			{
+				SQString* key = node->key._VAL.asString;
+				spdlog::info("Offset {:16X} {},{}",offset+8, key->_val, sq_getTypeName(node->val._Type));
+			}
+		}*/
+		return true;
+	case OT_USERDATA:
+		spdlog::info("Offset {:16X} Found UserData", offset);
+		return true;
+	case OT_INSTANCE:
+		spdlog::info("Offset {:16X} Found Instance", offset);
+		return true;
+	case OT_ENTITY:
+		spdlog::info("Offset {:16X} Found Entity", offset);
+		return true;
+	}
+	spdlog::info("Offset {:16X} 0x{:16X}", offset, *(long long*)(basePointer + offset));
+	return false;
+}
+
+template <ScriptContext context> long long SQVMExecuteHook2(
+	HSquirrelVM* sqvm, SQObject* closure, int paramAmount, int stackbase, SQObject* outres, int throwerror, unsigned int calltype)
+{
+	spdlog::info("Running execute with {}", closure->_VAL.asClosure->_function._VAL.asFuncProto->funcName._VAL.asString->_val);
+	spdlog::info("paramAmount = {} stackbase = {} throwerror = {} calltype = {}", paramAmount, stackbase, throwerror, calltype);
+	for (int i = 0; i < 0x4408; i += 8)
+	{
+		if (dumpSQObject((long long)sqvm->sharedState, i))
+			i += 8;
+	}
+	long long ret = SQVMExecuteHook<context>(sqvm, closure, paramAmount, stackbase, outres, throwerror, calltype);
+	spdlog::info("split Here");
+	for (int i = 0; i < 0x4408; i += 8)
+	{
+		if (dumpSQObject((long long)sqvm->sharedState, i))
+			i += 8;
+	}
+	spdlog::info("Return execute {} with {}", closure->_VAL.asClosure->_function._VAL.asFuncProto->funcName._VAL.asString->_val, ret);
+
+	return ret;
+}
+
+// hooks
+template <ScriptContext context> SQInteger SQPrintHook(void* sqvm, char* fmt, ...)
+{
+	va_list va;
+	va_start(va, fmt);
+
+	SQChar buf[1024];
+	int charsWritten = vsnprintf_s(buf, _TRUNCATE, fmt, va);
+
+	if (charsWritten > 0)
+	{
+		if (buf[charsWritten - 1] == '\n')
+			buf[charsWritten - 1] = '\0';
+
+		spdlog::info("[{} SCRIPT] {}", GetContextName(context), buf);
+	}
+
+	va_end(va);
+	return 0;
+}
+
+template <ScriptContext context> void* CreateNewVMHook(void* a1, ScriptContext realContext)
+{
+	void* sqvm;
+
+	if (context == ScriptContext::CLIENT)
+	{
+		sqvm = ClientCreateNewVM(a1, realContext);
+
+		if (realContext == ScriptContext::UI)
+			g_UISquirrelManager->VMCreated(sqvm);
+		else
+			g_ClientSquirrelManager->VMCreated(sqvm);
+	}
+	else if (context == ScriptContext::SERVER)
+	{
+		sqvm = ServerCreateNewVM(a1, context);
+		g_ServerSquirrelManager->VMCreated(sqvm);
+	}
+
+	spdlog::info("CreateNewVM {} {}", GetContextName(realContext), sqvm);
+	return sqvm;
+}
+
+template <ScriptContext context> void DestroyVMHook(void* a1, void* sqvm)
+{
+	ScriptContext realContext = context; // ui and client use the same function so we use this for prints
+
+	if (context == ScriptContext::CLIENT)
+	{
+		if (g_ClientSquirrelManager->sqvm == sqvm)
+			g_ClientSquirrelManager->VMDestroyed();
+		else if (g_UISquirrelManager->sqvm == sqvm)
+		{
+			g_UISquirrelManager->VMDestroyed();
+			realContext = ScriptContext::UI;
+		}
+
+		ClientDestroyVM(a1, sqvm);
+	}
+	else if (context == ScriptContext::SERVER)
+	{
+		g_ServerSquirrelManager->VMDestroyed();
+		ServerDestroyVM(a1, sqvm);
+	}
+
+	spdlog::info("DestroyVM {} {}", GetContextName(realContext), sqvm);
+}
+
+template <ScriptContext context> void ScriptCompileErrorHook(void* sqvm, const char* error, const char* file, int line, int column)
+{
+	ScriptContext realContext = context; // ui and client use the same function so we use this for prints
+	if (context == ScriptContext::CLIENT && sqvm == g_UISquirrelManager->sqvm)
+		realContext = ScriptContext::UI;
+
+	spdlog::error("{} SCRIPT COMPILE ERROR {}", GetContextName(realContext), error);
+	spdlog::error("{} line [{}] column [{}]", file, line, column);
+
+	// dont call the original since it kills game
+	// in the future it'd be nice to do an actual error with UICodeCallback_ErrorDialog here, but only if we're compiling level scripts
+	// compilestring and stuff shouldn't tho
+	// though, that also has potential to be REALLY bad if we're compiling ui scripts lol
+}
+
+template <ScriptContext context> char CallScriptInitCallbackHook(void* sqvm, const char* callback)
+{
+	char ret;
+
+	if (context == ScriptContext::CLIENT)
+	{
+		ScriptContext realContext = context; // ui and client use the same function so we use this for prints
+		bool shouldCallCustomCallbacks = false;
+
+		// since we don't hook arbitrary callbacks yet, make sure we're only doing callbacks on inits
+		if (!strcmp(callback, "UICodeCallback_UIInit"))
+		{
+			realContext = ScriptContext::UI;
+			shouldCallCustomCallbacks = true;
+		}
+		else if (!strcmp(callback, "ClientCodeCallback_MapSpawn"))
+			shouldCallCustomCallbacks = true;
+
+		// run before callbacks
+		// todo: we need to verify if RunOn is valid for current state before calling callbacks
+		if (shouldCallCustomCallbacks)
+		{
+			for (Mod mod : g_ModManager->m_loadedMods)
+			{
+				if (!mod.Enabled)
+					continue;
+
+				for (ModScript script : mod.Scripts)
+				{
+					for (ModScriptCallback modCallback : script.Callbacks)
+					{
+						if (modCallback.Context == realContext && modCallback.BeforeCallback.length())
+						{
+							spdlog::info(
+								"Running custom {} script callback \"{}\"", GetContextName(realContext), modCallback.BeforeCallback);
+							ClientCallScriptInitCallback(sqvm, modCallback.BeforeCallback.c_str());
+						}
+					}
+				}
+			}
+		}
+
+		spdlog::info("{} CodeCallback {} called", GetContextName(realContext), callback);
+		if (!shouldCallCustomCallbacks)
+			spdlog::info("Not executing custom callbacks for CodeCallback {}", callback);
+		ret = ClientCallScriptInitCallback(sqvm, callback);
+
+		// run after callbacks
+		if (shouldCallCustomCallbacks)
+		{
+			for (Mod mod : g_ModManager->m_loadedMods)
+			{
+				if (!mod.Enabled)
+					continue;
+
+				for (ModScript script : mod.Scripts)
+				{
+					for (ModScriptCallback modCallback : script.Callbacks)
+					{
+						if (modCallback.Context == realContext && modCallback.AfterCallback.length())
+						{
+							spdlog::info(
+								"Running custom {} script callback \"{}\"", GetContextName(realContext), modCallback.AfterCallback);
+							ClientCallScriptInitCallback(sqvm, modCallback.AfterCallback.c_str());
+						}
+					}
+				}
+			}
+		}
+	}
+	else if (context == ScriptContext::SERVER)
+	{
+		// since we don't hook arbitrary callbacks yet, make sure we're only doing callbacks on inits
+		bool shouldCallCustomCallbacks = !strcmp(callback, "CodeCallback_MapSpawn");
+
+		// run before callbacks
+		// todo: we need to verify if RunOn is valid for current state before calling callbacks
+		if (shouldCallCustomCallbacks)
+		{
+			for (Mod mod : g_ModManager->m_loadedMods)
+			{
+				if (!mod.Enabled)
+					continue;
+
+				for (ModScript script : mod.Scripts)
+				{
+					for (ModScriptCallback modCallback : script.Callbacks)
+					{
+						if (modCallback.Context == ScriptContext::SERVER && modCallback.BeforeCallback.length())
+						{
+							spdlog::info("Running custom {} script callback \"{}\"", GetContextName(context), modCallback.BeforeCallback);
+							ServerCallScriptInitCallback(sqvm, modCallback.BeforeCallback.c_str());
+						}
+					}
+				}
+			}
+		}
+
+		spdlog::info("{} CodeCallback {} called", GetContextName(context), callback);
+		if (!shouldCallCustomCallbacks)
+			spdlog::info("Not executing custom callbacks for CodeCallback {}", callback);
+		ret = ServerCallScriptInitCallback(sqvm, callback);
+
+		// run after callbacks
+		if (shouldCallCustomCallbacks)
+		{
+			for (Mod mod : g_ModManager->m_loadedMods)
+			{
+				if (!mod.Enabled)
+					continue;
+
+				for (ModScript script : mod.Scripts)
+				{
+					for (ModScriptCallback modCallback : script.Callbacks)
+					{
+						if (modCallback.Context == ScriptContext::SERVER && modCallback.AfterCallback.length())
+						{
+							spdlog::info("Running custom {} script callback \"{}\"", GetContextName(context), modCallback.AfterCallback);
+							ServerCallScriptInitCallback(sqvm, modCallback.AfterCallback.c_str());
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return ret;
+}
+
+template <ScriptContext context> void ExecuteCodeCommand(const CCommand& args)
+{
+	if (context == ScriptContext::CLIENT)
+		g_ClientSquirrelManager->ExecuteCode(args.ArgS());
+	else if (context == ScriptContext::UI)
+		g_UISquirrelManager->ExecuteCode(args.ArgS());
+	else if (context == ScriptContext::SERVER)
+		g_ServerSquirrelManager->ExecuteCode(args.ArgS());
 }
