@@ -490,7 +490,7 @@ void InitialiseServerSquirrel(HMODULE baseAddress)
 	 ENABLER_CREATEHOOK(
 		hook,
 		(char*)baseAddress + 0x2F950,
-		&SQVMExecuteHook2<ScriptContext::SERVER>,
+		&SQVMExecuteHook<ScriptContext::SERVER>,
 		reinterpret_cast<LPVOID*>(&ServerSQVMExecute)); // server sqvmexecute function
    /* ENABLER_CREATEHOOK(
         hook,
