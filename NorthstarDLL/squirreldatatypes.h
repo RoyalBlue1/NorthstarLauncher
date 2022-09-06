@@ -482,3 +482,218 @@ struct SQUserData
 	long long typeId;
 	char data[1];
 };
+
+struct SQLocalVarInfo
+{
+	SQObject name;
+	long long qword10;
+	int _start_op;
+	int _end_op;
+	int dword20;
+	int dword24;
+};
+
+struct SQLineInfo
+{
+	int line;
+	int op;
+};
+
+struct __declspec(align(8)) SQFuncState
+{
+	BYTE gap_0[1536];
+	int unknown_600;
+	BYTE gap_604[256];
+	int lexicalScopesSizeMaybe;
+	BYTE gap_708[8200];
+	SQLocalVarInfo constInfo[32];
+	int _constSize;
+	BYTE gap_2C14[1292];
+	SQLocalVarInfo* _vlocalsData;
+	unsigned int _vlocalsSize;
+	unsigned int _vlocalsAllocatedSize;
+	int* unknownPointer_3130;
+	unsigned int unknown_3138;
+	BYTE gap_313C[20];
+	unsigned int _stacksize;
+	BYTE gap_3154[36];
+	SQObject unknownObject_3178;
+	BYTE gap_3188[8];
+	unsigned int unknown_3190;
+	BYTE gap_3194[12];
+	unsigned int _parametersSize;
+	BYTE gap_31A4[4];
+	char unkknown_31A8;
+	BYTE gap_31A9[7];
+	unsigned int unknown_31B0;
+	BYTE gap_31B4[4];
+	SQInstruction* _instructions;
+	unsigned int _instructionsSize;
+	unsigned int _instructionsAllocatedSize;
+	BYTE gap_31C8[8];
+	unsigned int unknown_31D0;
+	BYTE gap_31D4[4];
+	int unknown_31D8;
+	BYTE gap_31DC[4];
+	SQLocalVarInfo* _localvarinfoData;
+	unsigned int _localvarinfoSize;
+	unsigned int _localvarinfoAllocadedSize;
+	BYTE gap_31F0[16];
+	SQObject unknownSqTable_3200;
+	SQObject funcName;
+	SQObject fileName;
+	BYTE gap_3230[4];
+	unsigned int _nliterralsMaybe;
+	unsigned int unknown_3238;
+	BYTE gap_323C[4];
+	SQLineInfo* _lineInfoData;
+	unsigned int _lineInfoSize;
+	int _lineInfoAllocatedSize;
+	__int64 unknown_3250;
+	BYTE gap_3258[32];
+	void* _defaultParamData;
+	unsigned int _defaultParamSize;
+	BYTE gap_3284[4];
+	int lastLineInfoLine;
+	BYTE gap_328C[4];
+	char unknown_3290;
+	BYTE gap_3291[7];
+	SQSharedState* sharedState;
+	BYTE gap_32A0[16];
+	__int64 unknown_32B0;
+	unsigned int unknown_32B8;
+	BYTE gap_32BC[4];
+	void* unknownPointer_32C0;
+	__int64 unknown_32C8;
+	void* error_func;
+	__int64 error_func_param;
+};
+
+enum SQOpCodes
+{
+	_OP_LINE = 0,
+	_OP_LOAD = 1,
+	_OP_LOADCOPY = 2,
+	_OP_LOADINT = 3,
+	_OP_LOADFLOAT = 4,
+	_OP_DLOAD = 5,
+	_OP_TAILCALL = 6,
+	_OP_CALL = 7,
+	_OP_PREPCALL = 8,
+	_OP_PREPCALLK = 9,
+	_OP_GETK = 10,
+	_OP_MOVE = 11,
+	_OP_NEWSLOT = 12,
+	_OP_DELETE = 13,
+	_OP_SET = 14,
+	_OP_GET = 15,
+	_OP_EQ = 16,
+	_OP_NE = 17,
+	_OP_ARITH = 18,
+	_OP_BITW = 19,
+	_OP_RETURN = 20,
+	_OP_LOADNULLS = 21,
+	_OP_LOADROOTTABLE = 22,
+	_OP_LOADBOOL = 23,
+	_OP_DMOVE = 24,
+	_OP_JMP = 25,
+	_OP_JNZ = 26,
+	_OP_JZ = 27,
+	_OP_LOADFREEVAR = 28,
+	_OP_VARGC = 29,
+	_OP_GETVARGV = 30,
+	_OP_NEWTABLE = 31,
+	_OP_NEWARRAY = 32,
+	_OP_APPENDARRAY = 33,
+	_OP_GETPARENT = 34,
+	_OP_COMPOUND_ARITH = 35,
+	_OP_COMPOUND_ARITH_LOCAL = 36,
+	_OP_INCREMENT_PREFIX = 37,
+	_OP_INCREMENT_PREFIX_LOCAL = 38,
+	_OP_INCREMENT_PREFIX_STRUCTFIELD = 39,
+	_OP_INCREMENT_POSTFIX = 40,
+	_OP_INCREMENT_POSTFIX_LOCAL = 41,
+	_OP_INCREMENT_POSTFIX_STRUCTFIELD = 42,
+	_OP_CMP = 43,
+	_OP_EXISTS = 44,
+	_OP_INSTANCEOF = 45,
+	_OP_NEG = 46,
+	_OP_NOT = 47,
+	_OP_BWNOT = 48,
+	_OP_CLOSURE = 49,
+	_OP_FOREACH = 50,
+	_OP_FOREACH_STATICARRAY_START = 51,
+	_OP_FOREACH_STATICARRAY_NEXT = 52,
+	_OP_FOREACH_STATICARRAY_NESTEDSTRUCT_START = 53,
+	_OP_FOREACH_STATICARRAY_NESTEDSTRUCT_NEXT = 54,
+	_OP_DELEGATE = 55,
+	_OP_CLONE = 56,
+	_OP_TYPEOF = 57,
+	_OP_PUSHTRAP = 58,
+	_OP_POPTRAP = 59,
+	_OP_THROW = 60,
+	_OP_CLASS = 61,
+	_OP_NEWSLOTA = 62,
+	_OP_EQ_LITERAL = 63,
+	_OP_NE_LITERAL = 64,
+	_OP_FOREACH_SETUP = 65,
+	_OP_ASSERT_FAILED = 66,
+	_OP_ADD = 67,
+	_OP_SUB = 68,
+	_OP_MUL = 69,
+	_OP_DIV = 70,
+	_OP_MOD = 71,
+	_OP_PREPCALLK_CALL = 72,
+	_OP_PREPCALLK_MOVE_CALL = 73,
+	_OP_PREPCALLK_LOADINT_CALL = 74,
+	_OP_CMP_JZ = 75,
+	_OP_INCREMENT_LOCAL_DISCARD_JMP = 76,
+	_OP_JZ_RETURN = 77,
+	_OP_JZ_LOADBOOL_RETURN = 78,
+	_OP_NEWVECTOR = 79,
+	_OP_ZEROVECTOR = 80,
+	_OP_GET_VECTOR_COMPONENT = 81,
+	_OP_SET_VECTOR_COMPONENT = 82,
+	_OP_VECTOR_COMPONENT_MINUSEQ = 83,
+	_OP_VECTOR_COMPONENT_PLUSEQ = 84,
+	_OP_VECTOR_COMPONENT_MULEQ = 85,
+	_OP_VECTOR_COMPONENT_DIVEQ = 86,
+	_OP_VECTOR_NORMALIZE = 87,
+	_OP_VECTOR_NORMALIZE_IN_PLACE = 88,
+	_OP_VECTOR_DOT_PRODUCT = 89,
+	_OP_VECTOR_DOT_PRODUCT2D = 90,
+	_OP_VECTOR_CROSS_PRODUCT = 91,
+	_OP_VECTOR_CROSS_PRODUCT2D = 92,
+	_OP_VECTOR_LENGTH = 93,
+	_OP_VECTOR_LENGTHSQR = 94,
+	_OP_VECTOR_LENGTH2D = 95,
+	_OP_VECTOR_LENGTH2DSQR = 96,
+	_OP_VECTOR_DISTANCE = 97,
+	_OP_VECTOR_DISTANCESQR = 98,
+	_OP_VECTOR_DISTANCE2D = 99,
+	_OP_VECTOR_DISTANCE2DSQR = 100,
+	_OP_INCREMENT_LOCAL_DISCARD = 101,
+	_OP_FASTCALL = 102,
+	_OP_FASTCALL_NATIVE = 103,
+	_OP_FASTCALL_NATIVE_ARGTYPECHECK = 104,
+	_OP_FASTCALL_ENV = 105,
+	_OP_FASTCALL_NATIVE_ENV = 106,
+	_OP_FASTCALL_NATIVE_ENV_ARGTYPECHECK = 107,
+	_OP_LOADGLOBALARRAY = 108,
+	_OP_GETGLOBAL = 109,
+	_OP_SETGLOBAL = 110,
+	_OP_COMPOUND_ARITH_GLOBAL = 111,
+	_OP_GETSTRUCTFIELD = 112,
+	_OP_SETSTRUCTFIELD = 113,
+	_OP_COMPOUND_ARITH_STRUCTFIELD = 114,
+	_OP_NEWSTRUCT = 115,
+	_OP_GETSUBSTRUCT = 116,
+	_OP_GETSUBSTRUCT_DYNAMIC = 117,
+	_OP_TYPECAST = 118,
+	_OP_TYPECHECK = 119,
+	_OP_TYPECHECK_ORNULL = 120,
+	_OP_TYPECHECK_NOTNULL = 121,
+	_OP_CHECK_ENTITY_CLASS = 122,
+	_OP_UNREACHABLE = 123,
+	_OP_ARRAY_RESIZE = 124,
+};

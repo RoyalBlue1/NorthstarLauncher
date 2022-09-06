@@ -130,6 +130,9 @@ typedef SQFloat* (*sq_getvectorType)(HSquirrelVM* sqvm, SQInteger iStackpos);
 typedef void* (*sq_createuserdataType)(HSquirrelVM* sqvm, SQInteger iSize);
 typedef SQRESULT (*sq_setuserdatatypeidType)(HSquirrelVM* sqvm, SQInteger iStackpos, uint64_t iTypeId);
 
+//sq instruction vector realloc
+typedef SQInstruction* (*sq_instructionvectorreallocType)(SQInstruction** pVector, SQInteger iNewSize);
+
 template <ScriptContext context> class SquirrelManager
 {
   private:
@@ -175,6 +178,8 @@ template <ScriptContext context> class SquirrelManager
 
 	sq_createuserdataType __sq_createuserdata;
 	sq_setuserdatatypeidType __sq_setuserdatatypeid;
+
+	sq_instructionvectorreallocType __sq_instructionvectorrealloc;
 #pragma endregion
 
   public:
@@ -316,6 +321,12 @@ template <ScriptContext context> class SquirrelManager
 	{
 		return __sq_setuserdatatypeid(sqvm, stackpos, typeId);
 	}
+
+	inline SQInstruction* reallocinstructionvector(SQInstruction** vector, const SQInteger size)
+	{
+		return __sq_instructionvectorrealloc(vector, size);
+	}
+
 #pragma endregion
 };
 
