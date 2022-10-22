@@ -1703,6 +1703,9 @@
     <ClCompile Include="scriptdatatables.cpp">
       <Filter>Source Files\Scripted</Filter>
     </ClCompile>
+    <ClCompile Include="squirreldatatypes.cpp">
+      <Filter>Source Files\Squirrel</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="audio_asm.asm">

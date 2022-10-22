@@ -5,6 +5,10 @@
    the type library 'server.dll'
 */
 
+#include <spdlog/fmt/bundled/format.h>
+
+
+
 struct HSquirrelVM;
 struct CallInfo;
 struct SQTable;
@@ -19,8 +23,21 @@ struct SQNativeClosure;
 struct SQArray;
 struct tableNode;
 struct SQUserData;
+struct SQInstruction;
+struct SQRefCounted;
+struct SQLineInfo;
+struct SQLocalVarInfo;
+struct SQDbgServer;
 
+const char* sq_getTypeName(int type);
+const char* sq_OpToString(int op);
+int sqInstructionToString(char* outBuffer, int outBufferLength, SQInstruction* instruction, HSquirrelVM* sqvm);
+int sqInstructionToString(char* outBuffer, int outBufferLength, SQInstruction* instruction, int index,int stackbase);
 typedef void (*releasehookType)(void* val, int size);
+
+#define HIDWORD(x) (*((int*)&(x) + 1)) //TODO REMOVE THESE
+#define LODWORD(x) (*((int*)&(x))) //TODO REMOVE THESE
+
 
 /* 127 */
 enum SQObjectType : int
@@ -60,15 +77,43 @@ enum SQObjectType : int
 	OT_THREAD = 0x8001000,
 	OT_FUNCPROTO = 0x8002000,
 	OT_CLAAS = 0x8004000,
-	OT_STRUCT = 0x8200000,
+	OT_STRUCT_DEF = 0x8100000,
+	OT_STRUCT_INSTANCE = 0x8200000,
 	OT_WEAKREF = 0x8010000,
 	OT_TABLE = 0xA000020,
 	OT_USERDATA = 0xA000080,
 	OT_INSTANCE = 0xA008000,
 	OT_ENTITY = 0xA400000,
+	OT_UNIMPLEMENTED_FUNCTION = 0x8080000,
 };
 
 /* 156 */
+
+
+struct SQRefCountedVTable
+{
+	void* constructorMaybe;
+	void (*destructor)(SQRefCounted*);
+};
+
+struct SQRefCounted
+{
+	SQRefCountedVTable* vtable;
+	int uiRef;
+	int padding;
+
+};
+
+struct othervarInfo
+{
+	__int64 unknown_0;
+	__int64 unknown_8;
+	SQString* name;
+	__int64 unknown_18;
+	__int64 unknown_20;
+	__int64 stackposition;
+};
+
 union SQObjectValue
 {
 	SQString* asString;
@@ -83,6 +128,9 @@ union SQObjectValue
 	float asFloat;
 	int asInteger;
 	SQUserData* asUserdata;
+	SQStructInstance* asStructInstance;
+	SQRefCounted* asRefCounted;
+	bool asBoolean;
 };
 
 /* 160 */
@@ -92,36 +140,180 @@ struct SQVector
 	float x;
 	float y;
 	float z;
+	SQVector()
+	{
+		this->_Type = OT_VECTOR;
+		this->x = 0.0;
+		this->y = 0.0;
+		this->z = 0.0;
+	}
 };
 
 /* 128 */
 struct SQObject
 {
 	SQObjectType _Type;
-	int structNumber;
+	int _structOffset;
 	SQObjectValue _VAL;
+
+	SQObject& operator=(const SQObject& other) {
+		if (this == &other)
+			return *this;
+		if (this->_Type & SQOBJECT_REF_COUNTED)
+		{
+			if (this->_VAL.asRefCounted->uiRef-- == 1)
+				//if (this->_VAL.asRefCounted->vtable && this->_VAL.asRefCounted->vtable->destructor)
+					this->_VAL.asRefCounted->vtable->destructor(this->_VAL.asRefCounted);
+		}
+		if (other._Type & SQOBJECT_REF_COUNTED)
+		{
+			other._VAL.asRefCounted->uiRef++;
+		}
+
+		this->_Type = other._Type;
+		this->_structOffset = other._structOffset;
+		this->_VAL = other._VAL;
+		return *this;
+	}
+	SQObject& operator=(const float& other)
+	{
+		if (this->_Type & SQOBJECT_REF_COUNTED)
+		{
+			if (this->_VAL.asRefCounted->uiRef-- == 1)
+				//if (this->_VAL.asRefCounted->vtable && this->_VAL.asRefCounted->vtable->destructor)
+					this->_VAL.asRefCounted->vtable->destructor(this->_VAL.asRefCounted);
+		}
+
+		this->_Type = OT_FLOAT;
+		this->_structOffset = 0;
+		this->_VAL.as64Integer = 0i64;
+		this->_VAL.asFloat = other;
+		return *this;
+	}
+	SQObject& operator=(const int& other)
+	{
+		if (this->_Type & SQOBJECT_REF_COUNTED)
+		{
+			if (this->_VAL.asRefCounted->uiRef-- == 1)
+				//if (this->_VAL.asRefCounted->vtable && this->_VAL.asRefCounted->vtable->destructor)
+					this->_VAL.asRefCounted->vtable->destructor(this->_VAL.asRefCounted);
+		}
+
+		this->_Type = OT_INTEGER;
+		this->_structOffset = 0;
+		this->_VAL.as64Integer = 0i64;
+		this->_VAL.asInteger = other;
+		return *this;
+	}
+	SQObject& operator=(const bool& other)
+	{
+		if (this->_Type & SQOBJECT_REF_COUNTED)
+		{
+			if (this->_VAL.asRefCounted->uiRef-- == 1)
+				//if (this->_VAL.asRefCounted->vtable && this->_VAL.asRefCounted->vtable->destructor)
+					this->_VAL.asRefCounted->vtable->destructor(this->_VAL.asRefCounted);
+		}
+
+		this->_Type = OT_BOOL;
+		this->_structOffset = 0;
+		this->_VAL.as64Integer = 0i64;
+		this->_VAL.asInteger =(int) other;
+		return *this;
+	}
+	SQObject& operator=(const SQVector& other)
+	{
+		if (this->_Type & SQOBJECT_REF_COUNTED)
+		{
+			if (this->_VAL.asRefCounted->uiRef-- == 1)
+				//if (this->_VAL.asRefCounted->vtable && this->_VAL.asRefCounted->vtable->destructor)
+					this->_VAL.asRefCounted->vtable->destructor(this->_VAL.asRefCounted);
+		}
+
+		this->_Type = OT_VECTOR;
+		SQVector* thisVec = (SQVector*)this;
+		thisVec->x = other.x;
+		thisVec->y = other.y;
+		thisVec->z = other.z;
+
+		return *this;
+	}
+	SQObject& operator=(SQTable* other);
+	SQObject& operator=(SQArray* other);
+	SQObject& operator=(SQStructInstance* other);
+	SQObject& operator=(SQString* other);
+
+	~SQObject()
+	{
+		if (this->_Type & SQOBJECT_REF_COUNTED)
+		{
+			if (this->_VAL.asRefCounted->uiRef-- == 1)
+				//if (this->_VAL.asRefCounted->vtable && this->_VAL.asRefCounted->vtable->destructor)
+					this->_VAL.asRefCounted->vtable->destructor(this->_VAL.asRefCounted);
+		}
+	}
+	SQObject()
+	{
+		this->_Type = OT_NULL;
+		this->_structOffset = 0;
+		this->_VAL.as64Integer = 0i64;
+	}
+	void Null()
+	{
+		if (this->_Type & SQOBJECT_REF_COUNTED)
+		{
+			if (this->_VAL.asRefCounted->uiRef-- == 1)
+				//if (this->_VAL.asRefCounted->vtable && this->_VAL.asRefCounted->vtable->destructor)
+					this->_VAL.asRefCounted->vtable->destructor(this->_VAL.asRefCounted);
+		}
+		this->_Type = OT_NULL;
+		this->_structOffset = 0;
+		this->_VAL.as64Integer = 0i64;
+	}
+	void IncrementReference() {
+		if (this->_Type & SQOBJECT_REF_COUNTED)
+		{
+			this->_VAL.asRefCounted->uiRef++;
+		}
+	}
+	void DecrementReference() {
+		if (this->_Type & SQOBJECT_REF_COUNTED)
+		{
+			if (this->_VAL.asRefCounted->uiRef-- == 1)
+				//if (this->_VAL.asRefCounted->vtable && this->_VAL.asRefCounted->vtable->destructor)
+					this->_VAL.asRefCounted->vtable->destructor(this->_VAL.asRefCounted);
+		}
+	}
+};
+
+struct alignas(4) SQInstruction
+{
+	int op;
+	int arg1;
+	int output;
+	short arg2;
+	short arg3;
 };
 
 /* 138 */
 struct alignas(8) SQString
 {
-	void* vftable;
+	void* vtable;
 	int uiRef;
 	int padding;
 	SQString* _next_maybe;
 	SQSharedState* sharedState;
 	int length;
-	unsigned char gap_24[4];
-	char _hash[8];
+	unsigned char gap_24[4]; // prob padding
+	long long _hash;
 	char _val[1];
 };
 
 /* 137 */
 struct alignas(8) SQTable
 {
-	void* vftable;
-	unsigned char gap_08[4];
+	void* vtable;
 	int uiRef;
+	unsigned char gap_0C[4];
 	unsigned char gap_10[8];
 	void* pointer_18;
 	void* pointer_20;
@@ -140,19 +332,19 @@ struct alignas(8) SQTable
 /* 140 */
 struct alignas(8) SQClosure
 {
-	void* vftable;
-	unsigned char gap_08[4];
+	void* vtable;
 	int uiRef;
+	unsigned char gap_0C[4];
 	void* pointer_10;
 	void* pointer_18;
 	void* pointer_20;
-	void* sharedState;
+	SQSharedState* sharedState;
 	SQObject obj_30;
 	SQObject _function;
 	SQObject* _outervalues;
 	unsigned char gap_58[8];
 	unsigned char gap_60[96];
-	SQObject* objectPointer_C0;
+	SQObject* fastcallClosureArray;
 	unsigned char gap_C8[16];
 };
 
@@ -160,26 +352,48 @@ struct alignas(8) SQClosure
 struct alignas(8) SQFunctionProto
 {
 	void* vftable;
-	unsigned char gap_08[4];
 	int uiRef;
-	unsigned char gap_10[8];
+	BYTE gap_0C[12];
 	void* pointer_18;
 	void* pointer_20;
 	void* sharedState;
 	void* pointer_30;
-	SQObjectType _fileNameType;
-	SQString* _fileName;
-	SQObjectType _funcNameType;
-	SQString* _funcName;
+	SQObject fileName;
+	SQObject funcName;
 	SQObject obj_58;
-	unsigned char gap_68[12];
+	BYTE gap_68[8];
+	int unknown_70;
 	int _stacksize;
-	unsigned char gap_78[48];
-	int nParameters;
-	unsigned char gap_AC[60];
+	BYTE gap_78[4];
+	int localVarInfoSize;
+	SQLocalVarInfo* localVarInfos;
+	int lineInfoSize;
+	BYTE gap_8C[4];
+	SQLineInfo* lineInfos;
+	int literalsSize;
+	BYTE gap_9C[4];
+	SQObject* literals;
+	__int32 nParameters;
+	BYTE gap_AC[4];
+	SQObject* _parameters;
+	int unknown_B8;
+	BYTE gap_BC[4];
+	SQObject* unknownPointer;
+	int unknown_C8;
+	BYTE gap_CC[4];
+	long long* unknownArray_D0;
+	int otherVarInfoSize;
+	BYTE gap_DC[4];
+	othervarInfo* _otherVarInfo;
 	int nDefaultParams;
-	unsigned char gap_EC[200];
+	BYTE gap_EC[4];
+	SQObject* objectArray_F0;
+	int unknown_F8;
+	BYTE gap_FC[4];
+	SQInstruction skippedInstruction;
+	SQInstruction instruction[1];
 };
+
 
 /* 152 */
 struct SQStructDef
@@ -200,7 +414,7 @@ struct SQStructDef
 /* 157 */
 struct alignas(8) SQNativeClosure
 {
-	void* vftable;
+	void* vtable;
 	int uiRef;
 	unsigned char gap_C[4];
 	long long value_10;
@@ -213,7 +427,7 @@ struct alignas(8) SQNativeClosure
 	long long value_40;
 	long long value_48;
 	long long value_50;
-	long long value_58;
+	long long functionPointer;
 	SQObjectType _nameType;
 	SQString* _name;
 	long long value_70;
@@ -224,7 +438,7 @@ struct alignas(8) SQNativeClosure
 /* 162 */
 struct SQArray
 {
-	void* vftable;
+	void* vtable;
 	int uiRef;
 	unsigned char gap_24[36];
 	SQObject* _values;
@@ -235,14 +449,14 @@ struct SQArray
 /* 129 */
 struct alignas(8) HSquirrelVM
 {
-	void* vftable;
+	void* vtable;
 	int uiRef;
-	unsigned char gap_8[12];
+	unsigned char gap_C[12];
 	void* _toString;
 	void* _roottable_pointer;
 	void* pointer_28;
 	CallInfo* ci;
-	CallInfo* _callstack;
+	CallInfo* _callsstack;
 	int _callsstacksize;
 	int _stackbase;
 	SQObject* _stackOfCurrentFunction;
@@ -252,7 +466,7 @@ struct alignas(8) HSquirrelVM
 	int _top;
 	SQObject* _stack;
 	unsigned char gap_78[8];
-	SQObject* _vargvstack;
+	SQObject* _vargsstack;
 	unsigned char gap_88[8];
 	SQObject temp_reg;
 	unsigned char gapA0[8];
@@ -272,14 +486,15 @@ struct alignas(8) HSquirrelVM
 	int trapAmount;
 	int _suspend_varargs;
 	int unknown_field_11C;
-	SQObject object_120;
+	SQObject _object_120;
 };
 
 /* 150 */
 struct SQStructInstance
 {
-	void* vftable;
-	unsigned char gap_8[16];
+	void* vtable;
+	unsigned int uiRef;
+	unsigned char gap_C[12];
 	void* pointer_18;
 	unsigned char gap_20[8];
 	SQSharedState* _sharedState;
@@ -288,106 +503,96 @@ struct SQStructInstance
 };
 
 /* 148 */
-struct SQSharedState
+struct alignas(8) SQSharedState
 {
-	unsigned char gap_0[72];
+	BYTE gap_0[72];
 	void* unknown;
-	unsigned char gap_50[16344];
+	BYTE gap_50[16308];
+	__int8 unknown_4004;
+	BYTE gap_4005[3];
+	__int32 unknown_4008;
+	BYTE gap_400C[12];
+	__int64 unknown_4018;
+	BYTE gap_4020[8];
 	SQObjectType _unknownTableType00;
-	long long _unknownTableValue00;
-	unsigned char gap_4038[16];
+	__int64 _unknownTableValue00;
+	BYTE gap_4038[16];
 	StringTable* _stringTable;
-	unsigned char gap_4050[32];
+	BYTE gap_4050[32];
 	SQObjectType _unknownTableType0;
-	long long _unknownTableValue0;
+	__int64 _unknownTableValue0;
 	SQObjectType _unknownObjectType1;
-	long long _unknownObjectValue1;
-	unsigned char gap_4090[8];
+	__int64 _unknownObjectValue1;
+	BYTE gap_4090[8];
 	SQObjectType _unknownArrayType2;
-	long long _unknownArrayValue2;
-	SQObjectType _gobalsArrayType;
-	SQStructInstance* _globalsArray;
-	unsigned char gap_40B8[16];
-	SQObjectType _nativeClosuresType;
-	SQTable* _nativeClosures;
-	SQObjectType _typedConstantsType;
-	SQTable* _typedConstants;
-	SQObjectType _untypedConstantsType;
-	SQTable* _untypedConstants;
-	SQObjectType _globalsMaybeType;
-	SQTable* _globals;
-	SQObjectType _functionsType;
-	SQTable* _functions;
-	SQObjectType _structsType;
-	SQTable* _structs;
-	SQObjectType _typeDefsType;
-	SQTable* _typeDefs;
-	SQObjectType unknownTableType;
-	SQTable* unknownTable;
-	SQObjectType _squirrelFilesType;
-	SQTable* _squirrelFiles;
-	unsigned char gap_4158[80];
-	SQObjectType _nativeClosures2Type;
-	SQTable* _nativeClosures2;
-	SQObjectType _entityTypesMaybeType;
-	SQTable* _entityTypesMaybe;
-	SQObjectType unknownTable2Type;
-	SQTable* unknownTable2;
-	unsigned char gap_41D8[72];
-	SQObjectType _compilerKeywordsType;
-	SQTable* _compilerKeywords;
+	__int64 _unknownArrayValue2;
+	SQObject _globalsArray;
+	BYTE gap_40B8[16];
+	SQObject _nativeClosures;
+	SQObject _typedConstants;
+	SQObject _untypedConstants;
+	SQObject _globals;
+	SQObject _functions;
+	SQObject _structs;
+	SQObject _typeDefs;
+	SQObject unknownTable;
+	SQObject _squirrelFiles;
+	BYTE gap_4158[24];
+	SQObject fileVariables;
+	BYTE gap_4180[16];
+	SQTable* unknownTable_4190;
+	BYTE gap_4198[8];
+	SQTable* unknownTable_41A0;
+	SQObject _nativeClosures2;
+	SQObject _entityTypesMaybe;
+	SQObject unknownTable2;
+	char* unknownPointer_41D8;
+	__int32 unknown_41E0;
+	BYTE gap_41E4[4];
+	char* unknownPointer_41E8;
+	int usedBufferBits;
+	unsigned int unknown_41F4;
+	BYTE gap_41F8[8];
+	__int64 unknown_4200;
+	__int64 unknown_4208;
+	BYTE gap_4210[8];
+	void* compiler;
+	SQObject _compilerKeywordTable;
 	HSquirrelVM* _currentThreadMaybe;
-	unsigned char gap_4238[8];
-	SQObjectType unknownTable3Type;
-	SQTable* unknownTable3;
-	unsigned char gap_4250[16];
-	SQObjectType unknownThreadType;
-	SQTable* unknownThread;
-	SQObjectType _tableNativeFunctionsType;
-	SQTable* _tableNativeFunctions;
-	SQObjectType _unknownTableType4;
-	long long _unknownObjectValue4;
-	SQObjectType _unknownObjectType5;
-	long long _unknownObjectValue5;
-	SQObjectType _unknownObjectType6;
-	long long _unknownObjectValue6;
-	SQObjectType _unknownObjectType7;
-	long long _unknownObjectValue7;
-	SQObjectType _unknownObjectType8;
-	long long _unknownObjectValue8;
-	SQObjectType _unknownObjectType9;
-	long long _unknownObjectValue9;
-	SQObjectType _unknownObjectType10;
-	long long _unknownObjectValue10;
-	SQObjectType _unknownObjectType11;
-	long long _unknownObjectValue11;
-	SQObjectType _unknownObjectType12;
-	long long _unknownObjectValue12;
-	SQObjectType _unknownObjectType13;
-	long long _unknownObjectValue13;
-	SQObjectType _unknownObjectType14;
-	long long _unknownObjectValue14;
-	SQObjectType _unknownObjectType15;
-	long long _unknownObjectValue15;
-	unsigned char gap_4340[16];
+	SQDbgServer* debugServer;
+	SQObject unknownTable3;
+	void* lastAddedChainableMaybe;
+	BYTE gap_4258[8];
+	SQObject unknownThread;
+	SQObject _tableNativeFunctions;
+	SQObject _unknownTable4;
+	SQObject _unknownObject5;
+	SQObject _unknownObject6;
+	SQObject _unknownObject7;
+	SQObject _unknownObject8;
+	SQObject _unknownObject9;
+	SQObject _unknownObject10;
+	SQObject _unknownObject11;
+	SQObject _unknownObject12;
+	SQObject _unknownObject13;
+	SQObject _unknownObject14;
+	SQObject _unknownObject15;
+	BYTE gap_4340[8];
+	void* compileErrorFunction;
 	void* printFunction;
-	unsigned char gap_4358[16];
+	BYTE gap_4358[16];
 	void* logEntityFunction;
-	unsigned char gap_4370[40];
-	SQObjectType _waitStringType;
-	SQString* _waitStringValue;
-	SQObjectType _SpinOffAndWaitForStringType;
-	SQString* _SpinOffAndWaitForStringValue;
-	SQObjectType _SpinOffAndWaitForSoloStringType;
-	SQString* _SpinOffAndWaitForSoloStringValue;
-	SQObjectType _SpinOffStringType;
-	SQString* _SpinOffStringValue;
-	SQObjectType _SpinOffDelayedStringType;
-	SQString* _SpinOffDelayedStringValue;
-	unsigned char gap_43E8[8];
-	bool enableDebugInfo; // functionality stripped
-	unsigned char gap_43F1[23];
+	BYTE gap_4370[40];
+	SQObject _waitStringValue;
+	SQObject _SpinOffAndWaitForStringValue;
+	SQObject _SpinOffAndWaitForSoloStringValue;
+	SQObject _SpinOffStringValue;
+	SQObject _SpinOffDelayedStringValue;
+	BYTE gap_43E8[8];
+	bool enableDebugInfo;
+	BYTE gap_43F1[23];
 };
+
 
 /* 165 */
 struct tableNode
@@ -400,15 +605,17 @@ struct tableNode
 /* 136 */
 struct alignas(8) CallInfo
 {
-	long long ip;
+	SQInstruction* ip;
 	SQObject* _literals;
 	SQObject obj10;
 	SQObject closure;
-	int _etraps[4];
+	int _etraps;
+	int _stackbaseOffset;
+	int _unknown;
+	int _unknown1;
 	int _root;
 	short _vargs_size;
 	short _vargs_base;
-	unsigned char gap[16];
 };
 
 /* 149 */
@@ -428,14 +635,7 @@ struct alignas(8) SQStackInfos
 };
 
 /* 151 */
-struct alignas(4) SQInstruction
-{
-	int op;
-	int arg1;
-	int output;
-	short arg2;
-	short arg3;
-};
+
 
 /* 154 */
 struct SQLexer
@@ -468,7 +668,7 @@ struct CSquirrelVM
 
 struct SQUserData
 {
-	void* vftable;
+	void* vtable;
 	int uiRef;
 	char gap_12[4];
 	long long unknown_10;
@@ -489,7 +689,7 @@ struct SQLocalVarInfo
 	long long qword10;
 	int _start_op;
 	int _end_op;
-	int dword20;
+	int stackpos;
 	int dword24;
 };
 
@@ -499,7 +699,7 @@ struct SQLineInfo
 	int op;
 };
 
-struct __declspec(align(8)) SQFuncState
+struct alignas(8) SQFuncState
 {
 	BYTE gap_0[1536];
 	int unknown_600;
@@ -568,6 +768,56 @@ struct __declspec(align(8)) SQFuncState
 	void* error_func;
 	__int64 error_func_param;
 };
+struct SQ_XMLElementState
+{
+	char name[256];
+	bool haschildren;
+};
+
+struct alignas(8) SQDbgServer
+{
+	SQ_XMLElementState xmlState[10];
+	BYTE gap_00[2];
+	int xmlCurrentElement;
+	HSquirrelVM* sqvm;
+	SQObject unknownObject_A18;
+	__int32 _state;
+	BYTE gap_A2C[4];
+	SOCKET unusedHostSocket;
+	SOCKET socketToDebugger;
+	SOCKET socketToDebuggerCopy;
+	__int64 unknown_A48;
+	__int64 unkonwn_A50;
+	char* functionpointer_A58;
+	__int64 unknown_A60;
+	void* functionpointer_A68;
+	__int64 unknown_A70;
+	void* functionpointer_A78;
+	__int64 unknown_A80;
+	BYTE gap_A88[2];
+	bool _autoupdate;
+	BYTE gap_A8C[5];
+	SQObject obj;
+	char* _scratchString;
+	__int64 unknown_AA8;
+	__int64 unknown_AB0;
+	SQObject unknownObject_AB8;
+	BYTE gap_AC8[8];
+	__int8 unknown_AD0;
+	BYTE gap_AD1[15];
+	__int64 unknown_AE0;
+	__int64 unknown_AE8;
+	BYTE gap_AF0[16];
+	__int64 unknown_B00;
+	__int64 unknown_B08;
+	__int64 unknown_B10;
+	__int64 unknown_B18;
+	char sendbuffer[1024];
+	unsigned int sendBufferLength;
+	BYTE gap_F24[4];
+	BYTE endat_F28;
+};
+
 
 enum SQOpCodes
 {
@@ -697,3 +947,109 @@ enum SQOpCodes
 	_OP_UNREACHABLE = 123,
 	_OP_ARRAY_RESIZE = 124,
 };
+
+
+
+template <> struct fmt::formatter<SQString>
+{
+	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
+	{
+		return ctx.end();
+	}
+
+	template <typename FormatContext> auto format(const SQString& input, FormatContext& ctx) -> decltype(ctx.out())
+	{
+		return format_to(ctx.out(), "{}", std::string(input._val,input.length));
+	}
+};
+
+template <> struct fmt::formatter<SQObject>
+{
+	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
+	{
+		return ctx.end();
+	}
+
+	template <typename FormatContext> auto format(const SQObject& input, FormatContext& ctx) -> decltype(ctx.out())
+	{
+		switch (input._Type)
+		{
+		case OT_INTEGER:
+			return format_to(ctx.out(), "INTEGER({})", input._VAL.asInteger);
+		case OT_FLOAT:
+			return format_to(ctx.out(), "FLOAT({})", input._VAL.asFloat);
+		case OT_STRING:
+			return format_to(ctx.out(), "STRING(\"{}\")", std::string(input._VAL.asString->_val, input._VAL.asString->length));
+		case OT_ASSET:
+			return format_to(ctx.out(), "ASSET(\"{}\")", std::string(input._VAL.asString->_val, input._VAL.asString->length));
+		case OT_FUNCPROTO:
+			return format_to(
+				ctx.out(),
+				"FUNCPROTO(\"{}\")",
+				std::string(input._VAL.asFuncProto->funcName._VAL.asString->_val, input._VAL.asFuncProto->funcName._VAL.asString->length));
+		case OT_NATIVECLOSURE:
+			return format_to(
+				ctx.out(),
+				"NATIVECLOSURE(\"{}\")",
+				std::string(input._VAL.asNativeClosure->_name->_val, input._VAL.asNativeClosure->_name->length));
+		case OT_BOOL:
+			return format_to(ctx.out(), "BOOL({})", input._VAL.asBoolean);
+		case OT_ARRAY:
+			
+			return format_to(ctx.out(), "ARRAY");
+		case OT_TABLE:
+			return format_to(ctx.out(), "TABLE");
+		case OT_ENTITY:
+			return format_to(ctx.out(), "ENTITY");
+		case OT_CLAAS:
+			return format_to(ctx.out(), "CLASS");
+		case OT_CLOSURE:
+			return format_to(
+				ctx.out(),
+				"CLOSURE(\"{}\")",
+				std::string(
+					input._VAL.asClosure->_function._VAL.asFuncProto->funcName._VAL.asString->_val,
+					input._VAL.asClosure->_function._VAL.asFuncProto->funcName._VAL.asString->length));
+		case OT_NULL:
+			return format_to(ctx.out(), "NULL");
+		case OT_STRUCT_DEF:
+			if (input._VAL.asStructDef->_nameType==OT_STRING)
+				return format_to(ctx.out(), "STRUCT_DEF({})",input._VAL.asStructDef->_name->_val);
+			return format_to(ctx.out(), "STRUCT_DEF");
+		case OT_STRUCT_INSTANCE:
+			return format_to(ctx.out(), "STRUCT_INSTANCE");
+		case OT_INSTANCE:
+			return format_to(ctx.out(), "CLASS_INSTANCE");
+		case OT_USERDATA:
+			return format_to(ctx.out(), "USERDATA");
+		default:
+			return format_to(ctx.out(), "NEED_TO_IMPLEMENT({})", std::string(sq_getTypeName(input._Type)));
+		}
+	}
+};
+
+template <> struct fmt::formatter<SQLocalVarInfo>
+{
+	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
+	{
+		return ctx.end();
+	}
+
+	template <typename FormatContext> auto format(const SQLocalVarInfo& input, FormatContext& ctx) -> decltype(ctx.out())
+	{
+
+		if (input.name._Type == OT_STRING)
+			return format_to(ctx.out(), "Var \"{}\" startOP {} endOP {} stackpos {} qword10 {:X} dword24 {:X}", std::string(input.name._VAL.asString->_val),input._start_op,input._end_op,input.stackpos,input.qword10,input.dword24);
+		else
+			return format_to(
+				ctx.out(),
+				"Var \"UNKNOWN\" startOP {} endOP {} stackpos {} qword10 {:X} dword24 {:X}",
+				input._start_op,
+				input._end_op,
+				input.stackpos,
+				input.qword10,
+				input.dword24);
+	
+	}
+};
+

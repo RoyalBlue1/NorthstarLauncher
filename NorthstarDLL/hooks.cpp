@@ -355,6 +355,10 @@ void CallAllPendingDLLLoadCallbacks()
 AUTOHOOK_ABSOLUTEADDR(_LoadLibraryExA, LoadLibraryExA, 
 HMODULE, WINAPI, (LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags))
 	{
+	if (!strncmp(lpLibFileName, "XInput1_3.dll",14)) {
+		lpLibFileName = "XInput9_1_0.dll";
+	}
+	
 	HMODULE moduleAddress = _LoadLibraryExA(lpLibFileName, hFile, dwFlags);
 
 	if (moduleAddress)
@@ -389,6 +393,8 @@ HMODULE, WINAPI, (LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags))
 AUTOHOOK_ABSOLUTEADDR(_LoadLibraryW, LoadLibraryW, 
 HMODULE, WINAPI, (LPCWSTR lpLibFileName))
 {
+	
+
 	HMODULE moduleAddress = _LoadLibraryW(lpLibFileName);
 
 	if (moduleAddress)

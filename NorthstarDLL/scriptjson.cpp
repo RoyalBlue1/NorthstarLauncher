@@ -152,7 +152,7 @@ void EncodeJSONTable(SQTable* table, rapidjson::GenericValue<rapidjson::UTF8<cha
 				obj->AddMember(rapidjson::StringRef(node->key._VAL.asString->_val), newArray, allocator);
 				break;
 			default:
-				spdlog::warn("SQ_EncodeJSON: squirrel type {} not supported", SQTypeNameFromID(node->val._Type));
+				spdlog::warn("SQ_EncodeJSON: squirrel type {} not supported", sq_getTypeName(node->val._Type));
 				break;
 			}
 		}
@@ -201,7 +201,7 @@ template <ScriptContext context> void EncodeJSONArray(
 			obj->PushBack(newArray, allocator);
 			break;
 		default:
-			spdlog::info("SQ encode Json type {} not supported", SQTypeNameFromID(node->_Type));
+			spdlog::info("SQ encode Json type {} not supported", sq_getTypeName(node->_Type));
 		}
 	}
 }

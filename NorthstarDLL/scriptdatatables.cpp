@@ -910,7 +910,7 @@ template <ScriptContext context> void RegisterDataTableFunctions()
 
 ON_DLL_LOAD_RELIESON("server.dll", ServerScriptDatatables, ServerSquirrel, (CModule module))
 {
-	RegisterDataTableFunctions<ScriptContext::SERVER>();
+	//RegisterDataTableFunctions<ScriptContext::SERVER>();
 
 	SQ_GetDatatableInternal<ScriptContext::SERVER> = module.Offset(0x1250f0).As<Datatable* (*)(HSquirrelVM*)>();
 }

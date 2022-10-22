@@ -145,8 +145,8 @@ long __stdcall ExceptionFilter(EXCEPTION_POINTERS* exceptionInfo)
 		spdlog::error("RDI: 0x{0:x}", exceptionContext->Rdi);
 		spdlog::error("RBP: 0x{0:x}", exceptionContext->Rbp);
 		spdlog::error("RSP: 0x{0:x}", exceptionContext->Rsp);
-		spdlog::error("R8: 0x{0:x}", exceptionContext->R8);
-		spdlog::error("R9: 0x{0:x}", exceptionContext->R9);
+		spdlog::error("R8:  0x{0:x}", exceptionContext->R8);
+		spdlog::error("R9:  0x{0:x}", exceptionContext->R9);
 		spdlog::error("R10: 0x{0:x}", exceptionContext->R10);
 		spdlog::error("R11: 0x{0:x}", exceptionContext->R11);
 		spdlog::error("R12: 0x{0:x}", exceptionContext->R12);
