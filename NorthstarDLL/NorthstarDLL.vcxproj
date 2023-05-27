@@ -417,6 +417,8 @@
     <ClInclude Include="engine\hoststate.h" />
     <ClInclude Include="engine\r2engine.h" />
     <ClInclude Include="exploit_fixes\ns_limits.h" />
+    <ClInclude Include="mapColl.h" />
+    <ClInclude Include="NavMesh.h" />
     <ClInclude Include="hooks\hooks.h" />
     <ClInclude Include="hooks\maxplayers.h" />
     <ClInclude Include="hooks\memalloc.h" />

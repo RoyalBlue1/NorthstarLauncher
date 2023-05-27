@@ -1185,6 +1185,12 @@
     <ClInclude Include="dedicated\dedicatedlogtoclient.h">
       <Filter>Header Files\dedicated</Filter>
     </ClInclude>
+    <ClInclude Include="NavMesh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mapColl.h">
+      <Filter>Header Files\shared</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\include\spdlog\fmt\bundled\LICENSE.rst">
