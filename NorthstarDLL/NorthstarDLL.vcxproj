@@ -493,6 +493,7 @@
     <ClCompile Include="engine\hoststate.cpp" />
     <ClCompile Include="engine\r2engine.cpp" />
     <ClCompile Include="engine\runframe.cpp" />
+    <ClCompile Include="increaseUIMGLimit.cpp" />
     <ClCompile Include="logging\crashhandler.cpp" />
     <ClCompile Include="logging\logging.cpp" />
     <ClCompile Include="logging\loghooks.cpp" />
